@@ -311,7 +311,7 @@ class Main(Star):
 
         try:
             _sub_data = {
-                "uid": uid,
+                "uid": int(uid),
                 "last": "",
                 "is_live": False,
                 "filter_types": filter_types,
