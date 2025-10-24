@@ -53,6 +53,7 @@ class Main(Star):
             interval_mins=self.interval_mins,
             rai=self.rai,
             node=self.node,
+            max_count=int(self.cfg.get("max_msg_count", 5))
         )
 
         self.dynamic_listener_task = asyncio.create_task(self.dynamic_listener.start())
@@ -131,17 +132,17 @@ class Main(Star):
 
         # 获取最新一条动态 (用于初始化 last_id)
         try:
-            # 构造新的订阅数据结构
+        # 构造新的订阅数据结构
             _sub_data = {
                 "uid": int(uid),
-                "last": "",
+                "last": "0",
                 "is_live": False,
                 "filter_types": filter_types,
                 "filter_regex": filter_regex,
             }
-            dyn = await self.bili_client.get_latest_dynamics(int(uid))
+            dyns = await self.bili_client.get_latest_dynamics(int(uid))
             _, dyn_id = await self.dynamic_listener._parse_and_filter_dynamics(
-                dyn, _sub_data
+                dyns, _sub_data, 1
             )
             _sub_data["last"] = dyn_id  # 更新 last id
         except Exception as e:
@@ -313,14 +314,14 @@ class Main(Star):
         try:
             _sub_data = {
                 "uid": uid,
-                "last": "",
+                "last": "0",
                 "is_live": False,
                 "filter_types": filter_types,
                 "filter_regex": filter_regex,
             }
-            dyn = await self.bili_client.get_latest_dynamics(int(uid))
+            dyns = await self.bili_client.get_latest_dynamics(int(uid))
             _, dyn_id = await self.dynamic_listener._parse_and_filter_dynamics(
-                dyn, _sub_data
+                dyns, _sub_data, 1
             )
             _sub_data["last"] = dyn_id
         except Exception as e:
@@ -387,12 +388,12 @@ class Main(Star):
     async def sub_test(self, event: AstrMessageEvent, uid: str):
         """测试订阅功能。仅测试获取动态与渲染图片功能，不保存订阅信息。"""
         sub_user = event.unified_msg_origin
-        dyn = await self.bili_client.get_latest_dynamics(int(uid))
-        if dyn:
-            render_data, _ = await self.dynamic_listener._parse_and_filter_dynamics(
-                dyn, {"uid": uid, "filter_types": [], "filter_regex": [], "last": ""}
+        dyns = await self.bili_client.get_latest_dynamics(int(uid))
+        if dyns:
+            render_data_list, _ = await self.dynamic_listener._parse_and_filter_dynamics(
+                dyns, {"uid": uid, "filter_types": [], "filter_regex": [], "last": "0"}, 1
             )
-            await self.dynamic_listener._handle_new_dynamic(sub_user, render_data)
+            await self.dynamic_listener._handle_new_dynamic(sub_user, render_data_list)
 
     async def terminate(self):
         if self.dynamic_listener_task and not self.dynamic_listener_task.done():

@@ -1,7 +1,7 @@
 import re
 import asyncio
 import traceback
-from typing import Dict, Any, Tuple
+from typing import Dict, Any, Tuple, List
 from astrbot.api import logger
 from astrbot.api.message_components import Image, Plain, Node
 from astrbot.api.event import MessageEventResult, MessageChain
@@ -27,6 +27,7 @@ class DynamicListener:
         interval_mins: float,
         rai: bool,
         node: bool,
+        max_count: int = 5
     ):
         self.context = context
         self.data_manager = data_manager
@@ -35,6 +36,7 @@ class DynamicListener:
         self.interval_mins = interval_mins
         self.rai = rai  # 非图文动态也可能需要这个配置
         self.node = node
+        self.max_count = max_count
 
     async def start(self):
         """启动后台监听循环。"""
@@ -49,6 +51,7 @@ class DynamicListener:
                 for sub_data in sub_list:
                     try:
                         await self._check_single_up(sub_user, sub_data)
+                        await asyncio.sleep(30)  # 避免请求过于频繁
                     except Exception as e:
                         logger.error(
                             f"处理订阅者 {sub_user} 的 UP主 {sub_data.get('uid', '未知UID')} 时发生未知错误: {e}\n{traceback.format_exc()}"
@@ -61,21 +64,21 @@ class DynamicListener:
             return
 
         # 检查动态更新
-        dyn = await self.bili_client.get_latest_dynamics(uid)
-        if dyn:
-            render_data, dyn_id = await self._parse_and_filter_dynamics(dyn, sub_data)
-            if render_data:
-                await self._handle_new_dynamic(sub_user, render_data)
+        dyns = await self.bili_client.get_latest_dynamics(uid)
+        if dyns:
+            render_data_list, dyn_id = await self._parse_and_filter_dynamics(dyns, sub_data, self.max_count)
+            if render_data_list:
+                await self._handle_new_dynamic(sub_user, render_data_list)
                 await self.data_manager.update_last_dynamic_id(sub_user, uid, dyn_id)
             elif dyn_id:  # 动态被过滤，只更新ID
                 await self.data_manager.update_last_dynamic_id(sub_user, uid, dyn_id)
 
-        # 检查直播状态
-        if "live" in sub_data.get("filter_types", []):
-            return
-        lives = await self.bili_client.get_live_info(uid)
-        if lives:
-            await self._handle_live_status(sub_user, sub_data, lives)
+        # # 检查直播状态
+        # if "live" in sub_data.get("filter_types", []):
+        #     return
+        # lives = await self.bili_client.get_live_info(uid)
+        # if lives:
+        #     await self._handle_live_status(sub_user, sub_data, lives)
 
     def _compose_plain_dynamic(
         self, render_data: Dict[str, Any], render_fail: bool = False
@@ -96,48 +99,52 @@ class DynamicListener:
     async def _send_dynamic(
         self, sub_user: str, chain_parts: list, send_node: bool = False
     ):
-        if self.node or send_node:
-            qqNode = Node(
-                uin=0,
-                name="AstrBot",
-                content=chain_parts,
-            )
-            await self.context.send_message(
-                sub_user, MessageEventResult(chain=[qqNode])
-            )
-        else:
-            await self.context.send_message(
-                sub_user, MessageEventResult(chain=chain_parts).use_t2i(False)
-            )
-
-    async def _handle_new_dynamic(self, sub_user: str, render_data: Dict[str, Any]):
-        """处理并发送新的动态通知。"""
-        # 非图文混合模式
-        if not self.rai and render_data.get("type") in (
-            "DYNAMIC_TYPE_DRAW",
-            "DYNAMIC_TYPE_WORD",
-        ):
-            ls = self._compose_plain_dynamic(render_data)
-            await self._send_dynamic(sub_user, ls)
-        # 默认渲染成图片
-        else:
-            img_path = await self.renderer.render_dynamic(render_data)
-            if img_path:
-                url = render_data.get("url", "")
-                ls = [
-                    Image.fromFileSystem(img_path),
-                    Plain(f"{url}"),
-                ]
-                if self.node:
-                    await self._send_dynamic(sub_user, ls, send_node=True)
-                else:
-                    await self.context.send_message(
-                        sub_user, MessageEventResult(chain=ls).use_t2i(False)
-                    )
+        try:
+            if self.node or send_node:
+                qqNode = Node(
+                    uin=0,
+                    name="AstrBot",
+                    content=chain_parts,
+                )
+                await self.context.send_message(
+                    sub_user, MessageEventResult(chain=[qqNode])
+                )
             else:
-                logger.error("渲染图片失败，尝试发送纯文本消息")
-                ls = self._compose_plain_dynamic(render_data, render_fail=True)
-                await self._send_dynamic(sub_user, ls, send_node=True)
+                await self.context.send_message(
+                    sub_user, MessageEventResult(chain=chain_parts).use_t2i(False)
+                )
+        except Exception as e:
+            logger.error(f"推送动态时，消息发送失败： {e}")
+
+    async def _handle_new_dynamic(self, sub_user: str, render_data_list: List[Dict[str, Any]]):
+        """处理并发送新的动态通知。"""
+        for render_data in render_data_list:
+            # 非图文混合模式
+            if not self.rai and render_data.get("type") in (
+                "DYNAMIC_TYPE_DRAW",
+                "DYNAMIC_TYPE_WORD",
+            ):
+                ls = self._compose_plain_dynamic(render_data)
+                await self._send_dynamic(sub_user, ls)
+            # 默认渲染成图片
+            else:
+                img_path = await self.renderer.render_dynamic(render_data)
+                if img_path:
+                    url = render_data.get("url", "")
+                    ls = [
+                        Image.fromFileSystem(img_path),
+                        Plain(f"{url}"),
+                    ]
+                    if self.node:
+                        await self._send_dynamic(sub_user, ls, send_node=True)
+                    else:
+                        await self.context.send_message(
+                            sub_user, MessageEventResult(chain=ls).use_t2i(False)
+                        )
+                else:
+                    logger.error("渲染图片失败，尝试发送纯文本消息")
+                    ls = self._compose_plain_dynamic(render_data, render_fail=True)
+                    await self._send_dynamic(sub_user, ls, send_node=True)
 
     async def _handle_live_status(self, sub_user: str, sub_data: Dict, live_info: Dict):
         """处理并发送直播状态变更通知。"""
@@ -182,17 +189,28 @@ class DynamicListener:
                 )
 
     async def _parse_and_filter_dynamics(
-        self, dyn: Dict, data: Dict
+        self, dyns: Dict, data: Dict, max_count: int = 10
     ) -> Tuple[Any, Any]:
         """
         解析并过滤动态。
         """
         uid, last = data["uid"], data["last"]
+        if last is None or last == "":
+            last = 0
+        else:
+            last = int(last)
         filter_types = data.get("filter_types", [])
         filter_regex = data.get("filter_regex", [])
-        items = dyn["items"]
-
-        for item in items:
+        items = dyns["items"]
+        if len(items) == 0:
+            return None, None
+        items.sort(key=lambda x: int(x["id_str"]), reverse=True)
+        dyn_id = max(int(items[0]["id_str"]), last)
+        render_data_list = []
+        for i in range(len(items)):
+            item = items[i]
+            if len(render_data_list) >= max_count:
+                break
             if "modules" not in item:
                 continue
             # 过滤置顶
@@ -202,28 +220,30 @@ class DynamicListener:
                 and item["modules"]["module_tag"]["text"] == "置顶"
             ):
                 continue
-            # 无新动态
-            if item["id_str"] == last:
-                return None, None
-
-            dyn_id = item["id_str"]
+            # 已无更多新动态
+            if int(item["id_str"]) <= last:
+                break
             # 转发类型
             if item.get("type") == "DYNAMIC_TYPE_FORWARD":
                 if "forward" in filter_types:
                     logger.info(f"转发类型在过滤列表 {filter_types} 中。")
-                    return None, dyn_id  # 返回 None 表示不推送，但更新 dyn_id
+                    continue
                 try:
                     content_text = item["modules"]["module_dynamic"]["desc"]["text"]
                 except (TypeError, KeyError):
                     content_text = None
                 if content_text and filter_regex:
+                    reg_matched = False
                     for regex_pattern in filter_regex:
                         try:
                             if re.search(regex_pattern, content_text):
                                 logger.info(f"转发内容匹配正则 {regex_pattern}。")
-                                return None, dyn_id
+                                reg_matched = True
+                                break
                         except re.error as e:
                             continue
+                    if reg_matched:
+                        continue
                 render_data = await self.renderer.build_render_data(item)
                 render_data["url"] = f"https://t.bilibili.com/{dyn_id}"
                 render_data["qrcode"] = await create_qrcode(render_data["url"])
@@ -236,19 +256,19 @@ class DynamicListener:
                         render_forward["image_urls"][0]
                     ]  # 保留第一项
                 render_data["forward"] = render_forward
-                return render_data, dyn_id
+                render_data_list.append(render_data)
             elif item.get("type") in ("DYNAMIC_TYPE_DRAW", "DYNAMIC_TYPE_WORD"):
                 # 图文类型过滤
                 if "draw" in filter_types:
                     logger.info(f"图文类型在过滤列表 {filter_types} 中。")
-                    return None, dyn_id
+                    continue
 
                 major = (
                     item.get("modules", {}).get("module_dynamic", {}).get("major", {})
                 )
                 if major.get("type") == "MAJOR_TYPE_BLOCKED":
                     logger.info(f"图文动态 {dyn_id} 为充电专属。")
-                    return None, dyn_id
+                    continue
                 opus = major["opus"]
                 summary_text = opus["summary"]["text"]
 
@@ -257,31 +277,35 @@ class DynamicListener:
                     and "lottery" in filter_types
                 ):
                     logger.info(f"互动抽奖在过滤列表 {filter_types} 中。")
-                    return None, dyn_id
+                    continue
                 if filter_regex:  # 检查列表是否存在且不为空
+                    reg_matched = False
                     for regex_pattern in filter_regex:
                         try:
                             if re.search(regex_pattern, summary_text):
                                 logger.info(
                                     f"图文动态 {dyn_id} 的 summary 匹配正则 '{regex_pattern}'。"
                                 )
-                                return None, dyn_id  # 匹配到任意一个正则就返回
+                                reg_matched = True
+                                break  # 匹配到任意一个正则就
                         except re.error as e:
                             continue  # 如果正则表达式本身有误，跳过这个正则继续检查下一个
+                    if reg_matched:
+                        continue
                 render_data = await self.renderer.build_render_data(item)
-                return render_data, dyn_id
+                render_data_list.append(render_data)
             elif item.get("type") == "DYNAMIC_TYPE_AV":
                 # 视频类型过滤
                 if "video" in filter_types:
                     logger.info(f"视频类型在过滤列表 {filter_types} 中。")
-                    return None, dyn_id
+                    continue
                 render_data = await self.renderer.build_render_data(item)
-                return render_data, dyn_id
+                render_data_list.append(render_data)
             elif item.get("type") == "DYNAMIC_TYPE_ARTICLE":
                 # 文章类型过滤
                 if "article" in filter_types:
                     logger.info(f"文章类型在过滤列表 {filter_types} 中。")
-                    return None, dyn_id
+                    continue
                 is_blocked = (
                     item["modules"]["module_dynamic"]["major"]["type"]
                     == "MAJOR_TYPE_BLOCKED"
@@ -291,10 +315,10 @@ class DynamicListener:
                 )
                 if major.get("type") == "MAJOR_TYPE_BLOCKED":
                     logger.info(f"文章 {dyn_id} 为充电专属。")
-                    return None, dyn_id
+                    continue
                 render_data = await self.renderer.build_render_data(item)
-                return render_data, dyn_id
+                render_data_list.append(render_data)
             else:
-                return None, None
+                continue
 
-        return None, None
+        return render_data_list, dyn_id

@@ -35,5 +35,11 @@
         "type": "string",
         "hint": "设置自部署t2i服务接口以获得有限的清晰度提升（可选）",
         "default": ""
+    },
+    "max_msg_count":{
+        "description": "max_msg_count",
+        "type": "int",
+        "hint": "订阅的每个up每次最多会推送几条新动态，例如：设置为5，检查订阅时一位up主发送了10条未推送的新动态，此时只会推送通过筛选的最新的5条动态",
+        "default": 5
     }
 }
