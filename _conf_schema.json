@@ -30,6 +30,12 @@
         "hint": "是否解析小程序",
         "default": true
     },
+    "enable_parse_BV": {
+        "description": "enable_parse_BV",
+        "type": "bool",
+        "hint": "是否解析B站视频链接",
+        "default": true
+    },
     "bili_t2i":{
         "description": "bili_t2i",
         "type": "string",

@@ -40,6 +40,7 @@ class Main(Star):
         self.rai = self.cfg.get("rai", True)
         self.node = self.cfg.get("node", False)
         self.enable_parse_miniapp = self.cfg.get("enable_parse_miniapp", True)
+        self.enable_parse_BV = self.cfg.get("enable_parse_BV", True)
         self.t2i_url = self.cfg.get("bili_t2i", "")
 
         self.data_manager = DataManager()
@@ -59,42 +60,43 @@ class Main(Star):
 
     @regex(BV)
     async def get_video_info(self, event: AstrMessageEvent):
-        if len(event.message_str) == 12:
-            bvid = event.message_str
-        else:
-            match_ = re.search(BV, event.message_str, re.IGNORECASE)
-            if not match_:
-                return
-            bvid = "BV" + match_.group(1)[2:]
+        if self.enable_parse_BV:
+            if len(event.message_str) == 12:
+                bvid = event.message_str
+            else:
+                match_ = re.search(BV, event.message_str, re.IGNORECASE)
+                if not match_:
+                    return
+                bvid = "BV" + match_.group(1)[2:]
 
-        video_data = await self.bili_client.get_video_info(bvid=bvid)
-        if not video_data:
-            return await event.send("获取视频信息失败了 (´;ω;`)")
-        info = video_data["info"]
-        online = video_data["online"]
+            video_data = await self.bili_client.get_video_info(bvid=bvid)
+            if not video_data:
+                return await event.send("获取视频信息失败了 (´;ω;`)")
+            info = video_data["info"]
+            online = video_data["online"]
 
-        render_data = await create_render_data()
-        render_data["name"] = "AstrBot"
-        render_data["avatar"] = await image_to_base64(LOGO_PATH)
-        render_data["title"] = info["title"]
-        render_data["text"] = (
-            f"UP 主: {info['owner']['name']}<br>"
-            f"播放量: {info['stat']['view']}<br>"
-            f"点赞: {info['stat']['like']}<br>"
-            f"投币: {info['stat']['coin']}<br>"
-            f"总共 {online['total']} 人正在观看"
-        )
-        render_data["image_urls"] = [info["pic"]]
-
-        img_path = await self.renderer.render_dynamic(render_data)
-        if img_path:
-            await event.send(MessageChain().file_image(img_path))
-        else:
-            msg = "渲染图片失败了 (´;ω;`)"
-            text = "\n".join(filter(None, render_data.get("text", "").split("<br>")))
-            await event.send(
-                MessageChain().message(msg).message(text).url_image(info["pic"])
+            render_data = await create_render_data()
+            render_data["name"] = "AstrBot"
+            render_data["avatar"] = await image_to_base64(LOGO_PATH)
+            render_data["title"] = info["title"]
+            render_data["text"] = (
+                f"UP 主: {info['owner']['name']}<br>"
+                f"播放量: {info['stat']['view']}<br>"
+                f"点赞: {info['stat']['like']}<br>"
+                f"投币: {info['stat']['coin']}<br>"
+                f"总共 {online['total']} 人正在观看"
             )
+            render_data["image_urls"] = [info["pic"]]
+
+            img_path = await self.renderer.render_dynamic(render_data)
+            if img_path:
+                await event.send(MessageChain().file_image(img_path))
+            else:
+                msg = "渲染图片失败了 (´;ω;`)"
+                text = "\n".join(filter(None, render_data.get("text", "").split("<br>")))
+                await event.send(
+                    MessageChain().message(msg).message(text).url_image(info["pic"])
+                )
 
     @command("订阅动态", alias={"bili_sub"})
     async def dynamic_sub(self, event: AstrMessageEvent, uid: str, input: GreedyStr):
