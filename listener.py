@@ -39,9 +39,9 @@ class DynamicListener:
     async def start(self):
         """启动后台监听循环。"""
         while True:
-            await asyncio.sleep(60 * self.interval_mins)
             if self.bili_client.credential is None:
                 logger.warning("bilibili sessdata 未设置，无法获取动态")
+                await asyncio.sleep(60 * self.interval_mins)
                 continue
 
             all_subs = self.data_manager.get_all_subscriptions()
@@ -53,6 +53,7 @@ class DynamicListener:
                         logger.error(
                             f"处理订阅者 {sub_user} 的 UP主 {sub_data.get('uid', '未知UID')} 时发生未知错误: {e}\n{traceback.format_exc()}"
                         )
+            await asyncio.sleep(60 * self.interval_mins)
 
     async def _check_single_up(self, sub_user: str, sub_data: Dict[str, Any]):
         """检查单个订阅的UP主是否有更新。"""
