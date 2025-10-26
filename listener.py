@@ -24,17 +24,16 @@ class DynamicListener:
         data_manager: DataManager,
         bili_client: BiliClient,
         renderer: Renderer,
-        interval_mins: float,
-        rai: bool,
-        node: bool,
+        cfg: dict
     ):
         self.context = context
         self.data_manager = data_manager
         self.bili_client = bili_client
         self.renderer = renderer
-        self.interval_mins = interval_mins
-        self.rai = rai  # 非图文动态也可能需要这个配置
-        self.node = node
+        self.interval_mins = float(cfg.get("interval_mins", 20))
+        self.rai = cfg.get("rai", True)
+        self.node = cfg.get("node", False)
+        self.dynamic_limit = cfg.get("dynamic_limit", 5)
 
     async def start(self):
         """启动后台监听循环。"""
@@ -63,12 +62,21 @@ class DynamicListener:
         # 检查动态更新
         dyn = await self.bili_client.get_latest_dynamics(uid)
         if dyn:
-            render_data, dyn_id = await self._parse_and_filter_dynamics(dyn, sub_data)
-            if render_data:
-                await self._handle_new_dynamic(sub_user, render_data)
-                await self.data_manager.update_last_dynamic_id(sub_user, uid, dyn_id)
-            elif dyn_id:  # 动态被过滤，只更新ID
-                await self.data_manager.update_last_dynamic_id(sub_user, uid, dyn_id)
+            result_list = await self._parse_and_filter_dynamics(dyn, sub_data)
+            sent = 0
+            for render_data, dyn_id in reversed(result_list):
+                if render_data:
+                    if sent < self.dynamic_limit:
+                        sent += 1
+                        await self._handle_new_dynamic(sub_user, render_data)
+                    await self.data_manager.update_last_dynamic_id(
+                        sub_user, uid, dyn_id
+                    )
+                    
+                elif dyn_id:  # 动态被过滤，只更新ID
+                    await self.data_manager.update_last_dynamic_id(
+                        sub_user, uid, dyn_id
+                    )
 
         # 检查直播状态
         if "live" in sub_data.get("filter_types", []):
@@ -181,16 +189,11 @@ class DynamicListener:
                     .url_image(cover_url),
                 )
 
-    async def _parse_and_filter_dynamics(
-        self, dyn: Dict, data: Dict
-    ) -> Tuple[Any, Any]:
-        """
-        解析并过滤动态。
-        """
-        uid, last = data["uid"], data["last"]
-        filter_types = data.get("filter_types", [])
-        filter_regex = data.get("filter_regex", [])
+    async def _get_dynamic_items(self, dyn: Dict, data: Dict):
+        """获取动态条目列表。"""
+        last = data["last"]
         items = dyn["items"]
+        new_items = []
 
         for item in items:
             if "modules" not in item:
@@ -204,14 +207,31 @@ class DynamicListener:
                 continue
             # 无新动态
             if item["id_str"] == last:
-                return None, None
+                break
+            new_items.append(item)
+        return new_items
 
+    async def _parse_and_filter_dynamics(self, dyn: Dict, data: Dict):
+        """
+        解析并过滤动态。
+        """
+        filter_types = data.get("filter_types", [])
+        filter_regex = data.get("filter_regex", [])
+        items = await self._get_dynamic_items(dyn, data)  # 不含last及置顶的动态列表
+        result_list = []
+        # 无新动态
+        if not items:
+            result_list.append((None, None))
+
+        for item in items:
             dyn_id = item["id_str"]
             # 转发类型
             if item.get("type") == "DYNAMIC_TYPE_FORWARD":
                 if "forward" in filter_types:
                     logger.info(f"转发类型在过滤列表 {filter_types} 中。")
-                    return None, dyn_id  # 返回 None 表示不推送，但更新 dyn_id
+                    # return None, dyn_id  # 返回 None 表示不推送，但更新 dyn_id
+                    result_list.append((None, dyn_id))
+                    continue
                 try:
                     content_text = item["modules"]["module_dynamic"]["desc"]["text"]
                 except (TypeError, KeyError):
@@ -221,7 +241,9 @@ class DynamicListener:
                         try:
                             if re.search(regex_pattern, content_text):
                                 logger.info(f"转发内容匹配正则 {regex_pattern}。")
-                                return None, dyn_id
+                                # return None, dyn_id
+                                result_list.append((None, dyn_id))
+                                continue
                         except re.error as e:
                             continue
                 render_data = await self.renderer.build_render_data(item)
@@ -236,19 +258,21 @@ class DynamicListener:
                         render_forward["image_urls"][0]
                     ]  # 保留第一项
                 render_data["forward"] = render_forward
-                return render_data, dyn_id
+                result_list.append((render_data, dyn_id))
             elif item.get("type") in ("DYNAMIC_TYPE_DRAW", "DYNAMIC_TYPE_WORD"):
                 # 图文类型过滤
                 if "draw" in filter_types:
                     logger.info(f"图文类型在过滤列表 {filter_types} 中。")
-                    return None, dyn_id
+                    result_list.append((None, dyn_id))
+                    continue
 
                 major = (
                     item.get("modules", {}).get("module_dynamic", {}).get("major", {})
                 )
                 if major.get("type") == "MAJOR_TYPE_BLOCKED":
                     logger.info(f"图文动态 {dyn_id} 为充电专属。")
-                    return None, dyn_id
+                    result_list.append((None, dyn_id))
+                    continue
                 opus = major["opus"]
                 summary_text = opus["summary"]["text"]
 
@@ -257,7 +281,8 @@ class DynamicListener:
                     and "lottery" in filter_types
                 ):
                     logger.info(f"互动抽奖在过滤列表 {filter_types} 中。")
-                    return None, dyn_id
+                    result_list.append((None, dyn_id))
+                    continue
                 if filter_regex:  # 检查列表是否存在且不为空
                     for regex_pattern in filter_regex:
                         try:
@@ -269,32 +294,31 @@ class DynamicListener:
                         except re.error as e:
                             continue  # 如果正则表达式本身有误，跳过这个正则继续检查下一个
                 render_data = await self.renderer.build_render_data(item)
-                return render_data, dyn_id
+                result_list.append((render_data, dyn_id))
             elif item.get("type") == "DYNAMIC_TYPE_AV":
                 # 视频类型过滤
                 if "video" in filter_types:
                     logger.info(f"视频类型在过滤列表 {filter_types} 中。")
-                    return None, dyn_id
+                    result_list.append((None, dyn_id))
+                    continue
                 render_data = await self.renderer.build_render_data(item)
-                return render_data, dyn_id
+                result_list.append((render_data, dyn_id))
             elif item.get("type") == "DYNAMIC_TYPE_ARTICLE":
                 # 文章类型过滤
                 if "article" in filter_types:
                     logger.info(f"文章类型在过滤列表 {filter_types} 中。")
-                    return None, dyn_id
-                is_blocked = (
-                    item["modules"]["module_dynamic"]["major"]["type"]
-                    == "MAJOR_TYPE_BLOCKED"
-                )
+                    result_list.append((None, dyn_id))
+                    continue
                 major = (
                     item.get("modules", {}).get("module_dynamic", {}).get("major", {})
                 )
                 if major.get("type") == "MAJOR_TYPE_BLOCKED":
                     logger.info(f"文章 {dyn_id} 为充电专属。")
-                    return None, dyn_id
+                    result_list.append((None, dyn_id))
+                    continue
                 render_data = await self.renderer.build_render_data(item)
-                return render_data, dyn_id
+                result_list.append((render_data, dyn_id))
             else:
-                return None, None
+                result_list.append((None, None))
 
-        return None, None
+        return result_list

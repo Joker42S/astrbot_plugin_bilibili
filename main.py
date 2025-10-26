@@ -36,9 +36,7 @@ class Main(Star):
         self.cfg = config
         self.context = context
 
-        self.interval_mins = float(self.cfg.get("interval_mins", 20))
         self.rai = self.cfg.get("rai", True)
-        self.node = self.cfg.get("node", False)
         self.enable_parse_miniapp = self.cfg.get("enable_parse_miniapp", True)
         self.enable_parse_BV = self.cfg.get("enable_parse_BV", True)
         self.t2i_url = self.cfg.get("bili_t2i", "")
@@ -51,9 +49,7 @@ class Main(Star):
             data_manager=self.data_manager,
             bili_client=self.bili_client,
             renderer=self.renderer,
-            interval_mins=self.interval_mins,
-            rai=self.rai,
-            node=self.node,
+            cfg = self.cfg
         )
 
         self.dynamic_listener_task = asyncio.create_task(self.dynamic_listener.start())
@@ -93,7 +89,9 @@ class Main(Star):
                 await event.send(MessageChain().file_image(img_path))
             else:
                 msg = "渲染图片失败了 (´;ω;`)"
-                text = "\n".join(filter(None, render_data.get("text", "").split("<br>")))
+                text = "\n".join(
+                    filter(None, render_data.get("text", "").split("<br>"))
+                )
                 await event.send(
                     MessageChain().message(msg).message(text).url_image(info["pic"])
                 )
@@ -141,9 +139,9 @@ class Main(Star):
             avatar = usr_info["face"]
             # 获取最新一条动态 (用于初始化 last_id)
             dyn = await self.bili_client.get_latest_dynamics(int(uid))
-            _, dyn_id = await self.dynamic_listener._parse_and_filter_dynamics(
+            _, dyn_id = (await self.dynamic_listener._parse_and_filter_dynamics(
                 dyn, _sub_data
-            )
+            ))[0]
             _sub_data["last"] = dyn_id  # 更新 last id
         except Exception as e:
             logger.error(f"获取 {name} 初始动态失败: {e}")
@@ -325,9 +323,9 @@ class Main(Star):
                 return MessageEventResult().message(msg)
 
             dyn = await self.bili_client.get_latest_dynamics(int(uid))
-            _, dyn_id = await self.dynamic_listener._parse_and_filter_dynamics(
+            _, dyn_id = (await self.dynamic_listener._parse_and_filter_dynamics(
                 dyn, _sub_data
-            )
+            ))[0]
             _sub_data["last"] = dyn_id
         except Exception as e:
             logger.error(f"获取 {usr_info['name']} 初始动态失败: {e}")
@@ -399,9 +397,12 @@ class Main(Star):
         sub_user = event.unified_msg_origin
         dyn = await self.bili_client.get_latest_dynamics(int(uid))
         if dyn:
-            render_data, _ = await self.dynamic_listener._parse_and_filter_dynamics(
-                dyn, {"uid": uid, "filter_types": [], "filter_regex": [], "last": ""}
-            )
+            render_data, _ = (
+                await self.dynamic_listener._parse_and_filter_dynamics(
+                    dyn,
+                    {"uid": uid, "filter_types": [], "filter_regex": [], "last": ""},
+                )
+            )[0]
             await self.dynamic_listener._handle_new_dynamic(sub_user, render_data)
 
     async def terminate(self):
