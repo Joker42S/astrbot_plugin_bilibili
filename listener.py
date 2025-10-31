@@ -24,7 +24,7 @@ class DynamicListener:
         data_manager: DataManager,
         bili_client: BiliClient,
         renderer: Renderer,
-        cfg: dict
+        cfg: dict,
     ):
         self.context = context
         self.data_manager = data_manager
@@ -73,7 +73,7 @@ class DynamicListener:
                     await self.data_manager.update_last_dynamic_id(
                         sub_user, uid, dyn_id
                     )
-                    
+
                 elif dyn_id:  # 动态被过滤，只更新ID
                     await self.data_manager.update_last_dynamic_id(
                         sub_user, uid, dyn_id
@@ -201,9 +201,8 @@ class DynamicListener:
                 continue
             # 过滤置顶
             if (
-                "module_tag" in item["modules"]
-                and "text" in item["modules"]["module_tag"]
-                and item["modules"]["module_tag"]["text"] == "置顶"
+                item["modules"].get("module_tag")
+                and item["modules"]["module_tag"].get("text") == "置顶"
             ):
                 continue
             # 无新动态
