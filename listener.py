@@ -206,7 +206,11 @@ class DynamicListener:
             ):
                 if item["id_str"] == last:
                     # 新动态记录为last后被设为置顶的情形（可能导致再次推送某条历史动态，未来设last缓存）
-                    return items[items.index(item) + 1] if items.index(item) + 1 < len(items) else None
+                    return (
+                        items[items.index(item) + 1]
+                        if items.index(item) + 1 < len(items)
+                        else None
+                    )
                 continue
             # 无新动态
             if item["id_str"] == last:
