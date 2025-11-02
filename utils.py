@@ -6,14 +6,6 @@ import io
 import base64
 import os
 from urllib.parse import urlparse
-from .constant import CURRENT_DIR
-import ssl
-import time
-import uuid
-from io import BytesIO
-from typing import Union
-import certifi
-from PIL import Image as PILImage
 
 
 async def create_render_data() -> dict:
@@ -118,84 +110,3 @@ async def parse_rich_text(summary, topic):
             text = text.replace(topic_info, topic_tag)
 
     return text
-
-
-async def bili_html_render(tmpl_str: str, tmpl_data: dict, api_url: str):
-    post_data = {
-        "tmpl": tmpl_str,
-        "json": False,
-        "tmpldata": tmpl_data,
-        "options": {
-            "full_page": True,
-            "type": "png",
-            "scale": "device",
-        },
-    }
-    url = f"{api_url}/generate"
-    return await bili_download_image_by_url(url, post_data)
-
-
-async def bili_download_image_by_url(url: str, post_data: dict = None) -> str:
-    """
-    取自astrbot/core/utils/io.py
-    """
-    try:
-        # 使用 certifi 提供的 CA 证书
-        ssl_context = ssl.create_default_context(cafile=certifi.where())
-        connector = aiohttp.TCPConnector(ssl=ssl_context)
-        async with aiohttp.ClientSession(
-            trust_env=True, connector=connector
-        ) as session:
-            async with session.post(url, json=post_data) as resp:
-                resp.raise_for_status()
-                return bili_save_temp_img(await resp.read())
-
-    except (aiohttp.ClientConnectorSSLError, aiohttp.ClientConnectorCertificateError):
-        async with aiohttp.ClientSession(
-            connector=aiohttp.TCPConnector(ssl=False)
-        ) as session:
-            async with session.post(url, json=post_data) as resp:
-                resp.raise_for_status()
-                return bili_save_temp_img(await resp.read())
-
-    except Exception as e:
-        raise e
-
-
-def bili_save_temp_img(img: Union[PILImage.Image, bytes]) -> str:
-    """
-    取自astrbot/core/utils/io.py
-    """
-    temp_dir = os.path.join(CURRENT_DIR, "temp")
-    if not os.path.exists(temp_dir):
-        os.makedirs(temp_dir)
-
-    # 清理超过 12 小时的旧临时文件
-    try:
-        for f in os.listdir(temp_dir):
-            file_path = os.path.join(temp_dir, f)
-            if os.path.isfile(file_path):
-                ctime = os.path.getctime(file_path)
-                if time.time() - ctime > 3600 * 12:
-                    os.remove(file_path)
-    except Exception as e:
-        print(f"清理临时文件失败: {e}")
-
-    timestamp = f"{int(time.time())}_{uuid.uuid4().hex[:8]}"
-    png_path = os.path.join(temp_dir, f"{timestamp}.png")
-
-    if isinstance(img, PILImage.Image):
-        img.save(png_path, "PNG")
-    elif isinstance(img, bytes):
-        try:
-            with PILImage.open(BytesIO(img)) as image_obj:
-                image_obj.save(png_path, "PNG")
-        except Exception as e:
-            # 如果 Pillow 无法解析，则直接写入二进制数据
-            print(f"无法将字节流作为图片解析，将直接写入文件。错误: {e}")
-            with open(png_path, "wb") as f:
-                f.write(img)
-    else:
-        raise TypeError(f"不支持的输入类型: {type(img)}")
-
-    return png_path

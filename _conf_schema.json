@@ -41,11 +41,5 @@
         "type": "int",
         "hint": "每个UP主的单次动态推送数量限制",
         "default": 5
-    },
-    "bili_t2i":{
-        "description": "bili_t2i",
-        "type": "string",
-        "hint": "设置自部署t2i服务接口以获得有限的清晰度提升（可选）",
-        "default": ""
     }
 }

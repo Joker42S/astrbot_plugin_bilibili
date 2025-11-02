@@ -1,10 +1,12 @@
 import os
+import time
+import uuid
 import asyncio
 from .utils import *
 from typing import Dict, Any
 from astrbot.api import logger
 from astrbot.api.all import Star
-from .constant import TEMPLATE_PATH, LOGO_PATH, IMG_PATH, MAX_ATTEMPTS, RETRY_DELAY
+from .constant import TEMPLATE_PATH, LOGO_PATH, TEMP_DIR, MAX_ATTEMPTS, RETRY_DELAY
 
 with open(TEMPLATE_PATH, "r", encoding="utf-8") as file:
     HTML_TEMPLATE = file.read()
@@ -15,42 +17,42 @@ class Renderer:
     负责将动态数据渲染成图片。
     """
 
-    def __init__(self, star_instance: Star, rai: bool, t2i_url: str):
+    def __init__(self, star_instance: Star, rai: bool):
         """
         初始化渲染器。
         """
         self.star = star_instance
         self.rai = rai
-        self.t2i_url = t2i_url
 
     async def render_dynamic(self, render_data: Dict[str, Any]):
         """
         将渲染数据字典渲染成最终图片。
         这是该类的主要入口方法。
         """
+        os.makedirs(TEMP_DIR, exist_ok=True)
+        options = {"full_page": True, "type": "png", "scale": "device"}
         for attempt in range(1, MAX_ATTEMPTS + 1):
             render_output = None
             try:
-                if not self.t2i_url:
-                    render_output = await self.star.html_render(
-                        HTML_TEMPLATE, render_data, False
-                    )
-                else:
-                    render_output = await bili_html_render(
-                        HTML_TEMPLATE, render_data, self.t2i_url
-                    )
+                render_output = await self.star.html_render(
+                    tmpl=HTML_TEMPLATE,
+                    data=render_data,
+                    return_url=False,
+                    options=options,
+                )
                 if (
                     render_output
                     and os.path.exists(render_output)
                     and os.path.getsize(render_output) > 0
                 ):
-                    await get_and_crop_image(render_output, IMG_PATH)
-                    return IMG_PATH  # 成功，返回图片路径
+                    filename = (
+                        f"dynamic_{int(time.time() * 1000)}_{uuid.uuid4().hex[:8]}.png"
+                    )
+                    output_path = os.path.join(TEMP_DIR, filename)
+                    await get_and_crop_image(render_output, output_path)
+                    return output_path  # 成功，返回图片路径
             except Exception as e:
                 logger.error(f"渲染图片失败 (尝试次数: {attempt}): {e}")
-            finally:
-                if render_output and os.path.exists(render_output):
-                    os.remove(render_output)
 
             if attempt < MAX_ATTEMPTS:
                 await asyncio.sleep(RETRY_DELAY)
