@@ -64,7 +64,7 @@ class Main(Star):
 
             video_data = await self.bili_client.get_video_info(bvid=bvid)
             if not video_data:
-                return await event.send("获取视频信息失败了 (´;ω;`)")
+                return await event.send(MessageChain().message("获取视频信息失败了 (´;ω;`)"))
             info = video_data["info"]
             online = video_data["online"]
 
