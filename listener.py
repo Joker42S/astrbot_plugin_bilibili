@@ -206,13 +206,6 @@ class DynamicListener:
                 item["modules"].get("module_tag")
                 and item["modules"]["module_tag"].get("text") == "置顶"
             ):
-                if item["id_str"] == last:
-                    # 新动态记录为last后被设为置顶的情形（可能导致再次推送某条历史动态，未来设last缓存）
-                    return (
-                        items[items.index(item) + 1]
-                        if items.index(item) + 1 < len(items)
-                        else None
-                    )
                 continue
 
             if item["id_str"] in known_ids:
@@ -247,15 +240,18 @@ class DynamicListener:
                 except (TypeError, KeyError):
                     content_text = None
                 if content_text and filter_regex:
+                    matched = False
                     for regex_pattern in filter_regex:
                         try:
                             if re.search(regex_pattern, content_text):
                                 logger.info(f"转发内容匹配正则 {regex_pattern}。")
-                                # return None, dyn_id
                                 result_list.append((None, dyn_id))
-                                continue
+                                matched = True
+                                break
                         except re.error as e:
                             continue
+                    if matched:
+                        continue
                 render_data = await self.renderer.build_render_data(item)
                 render_data["url"] = f"https://t.bilibili.com/{dyn_id}"
                 render_data["qrcode"] = await create_qrcode(render_data["url"])
@@ -294,15 +290,20 @@ class DynamicListener:
                     result_list.append((None, dyn_id))
                     continue
                 if filter_regex:  # 检查列表是否存在且不为空
+                    matched = False
                     for regex_pattern in filter_regex:
                         try:
                             if re.search(regex_pattern, summary_text):
                                 logger.info(
                                     f"图文动态 {dyn_id} 的 summary 匹配正则 '{regex_pattern}'。"
                                 )
-                                return None, dyn_id  # 匹配到任意一个正则就返回
+                                result_list.append((None, dyn_id))
+                                matched = True
+                                break
                         except re.error as e:
                             continue  # 如果正则表达式本身有误，跳过这个正则继续检查下一个
+                    if matched:
+                        continue
                 render_data = await self.renderer.build_render_data(item)
                 result_list.append((render_data, dyn_id))
             elif item.get("type") == "DYNAMIC_TYPE_AV":
