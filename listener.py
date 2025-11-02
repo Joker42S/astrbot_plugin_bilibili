@@ -194,6 +194,8 @@ class DynamicListener:
         """获取动态条目列表。"""
         last = data["last"]
         items = dyn["items"]
+        recent_ids = data.get("recent_ids", []) or []
+        known_ids = {x for x in ([last] + recent_ids) if x}
         new_items = []
 
         for item in items:
@@ -212,10 +214,11 @@ class DynamicListener:
                         else None
                     )
                 continue
-            # 无新动态
-            if item["id_str"] == last:
+
+            if item["id_str"] in known_ids:
                 break
             new_items.append(item)
+
         return new_items
 
     async def _parse_and_filter_dynamics(self, dyn: Dict, data: Dict):

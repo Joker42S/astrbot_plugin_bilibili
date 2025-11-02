@@ -2,7 +2,7 @@ import json
 import os
 from typing import Dict, List, Any, Optional
 from astrbot.api import logger
-from .constant import DEFAULT_CFG, DATA_PATH
+from .constant import DEFAULT_CFG, DATA_PATH, RECENT_DYNAMIC_CACHE
 from astrbot.api.star import StarTools
 
 
@@ -103,6 +103,13 @@ class DataManager:
         sub = self.get_subscription(sub_user, uid)
         if sub:
             sub["last"] = dyn_id
+            history = sub.setdefault("recent_ids", [])
+            if dyn_id:
+                if dyn_id in history:
+                    history.remove(dyn_id)
+                history.insert(0, dyn_id)
+                if len(history) > RECENT_DYNAMIC_CACHE:
+                    del history[RECENT_DYNAMIC_CACHE:]
             await self.save()
 
     async def update_live_status(self, sub_user: str, uid: int, is_live: bool):

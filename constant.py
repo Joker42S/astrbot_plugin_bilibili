@@ -12,6 +12,7 @@ TEMPLATE_PATH = os.path.join(CURRENT_DIR, "template.html")
 TEMP_DIR = os.path.join(CURRENT_DIR, "temp")
 MAX_ATTEMPTS = 3
 RETRY_DELAY = 2
+RECENT_DYNAMIC_CACHE = 4
 
 category_mapping = {
     "全部": "ALL",

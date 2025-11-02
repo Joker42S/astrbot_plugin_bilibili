@@ -124,6 +124,7 @@ class Main(Star):
                 "is_live": False,
                 "filter_types": filter_types,
                 "filter_regex": filter_regex,
+                "recent_ids": [],
             }
             # 获取用户信息
             usr_info, msg = await self.bili_client.get_user_info(int(uid))
@@ -140,6 +141,7 @@ class Main(Star):
                 await self.dynamic_listener._parse_and_filter_dynamics(dyn, _sub_data)
             )[0]
             _sub_data["last"] = dyn_id  # 更新 last id
+            _sub_data["recent_ids"] = [dyn_id]
         except Exception as e:
             logger.error(f"获取 {name} 初始动态失败: {e}")
         finally:
@@ -264,6 +266,7 @@ class Main(Star):
                 "is_live": False,
                 "filter_types": filter_types,
                 "filter_regex": filter_regex,
+                "recent_ids": [],
             }
 
             usr_info, msg = await self.bili_client.get_user_info(int(uid))
@@ -275,6 +278,7 @@ class Main(Star):
                 await self.dynamic_listener._parse_and_filter_dynamics(dyn, _sub_data)
             )[0]
             _sub_data["last"] = dyn_id
+            _sub_data["recent_ids"] = [dyn_id]
         except Exception as e:
             logger.error(f"获取 {usr_info['name']} 初始动态失败: {e}")
         finally:
@@ -348,7 +352,13 @@ class Main(Star):
             render_data, _ = (
                 await self.dynamic_listener._parse_and_filter_dynamics(
                     dyn,
-                    {"uid": uid, "filter_types": [], "filter_regex": [], "last": ""},
+                    {
+                        "uid": uid,
+                        "filter_types": [],
+                        "filter_regex": [],
+                        "last": "",
+                        "recent_ids": [],
+                    },
                 )
             )[0]
             await self.dynamic_listener._handle_new_dynamic(sub_user, render_data)
