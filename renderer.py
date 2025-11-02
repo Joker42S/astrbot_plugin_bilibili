@@ -30,7 +30,7 @@ class Renderer:
         这是该类的主要入口方法。
         """
         os.makedirs(TEMP_DIR, exist_ok=True)
-        options = {"full_page": True, "type": "png", "scale": "device"}
+        options = {"full_page": True, "type": "png", "quality": None, "scale": "device"}
         for attempt in range(1, MAX_ATTEMPTS + 1):
             render_output = None
             try:
