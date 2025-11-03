@@ -1,9 +1,10 @@
 import json
 import os
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Tuple
 from astrbot.api import logger
-from .constant import DEFAULT_CFG, DATA_PATH, RECENT_DYNAMIC_CACHE
 from astrbot.api.star import StarTools
+from .constant import DEFAULT_CFG, DATA_PATH
+from .subscription import Subscription
 
 
 class DataManager:
@@ -45,41 +46,56 @@ class DataManager:
         with open(self.path, "w", encoding="utf-8") as f:
             json.dump(self.data, f, ensure_ascii=False, indent=2)
 
-    def get_all_subscriptions(self) -> Dict[str, List[Dict[str, Any]]]:
+    def get_all_subscriptions(self) -> Dict[str, List[Subscription]]:
         """
         获取所有的订阅列表。
         """
-        return self.data.get("bili_sub_list", {})
+        result: Dict[str, List[Subscription]] = {}
+        for sub_user, entries in self.data.get("bili_sub_list", {}).items():
+            result[sub_user] = [Subscription.from_dict(entry) for entry in entries]
+        return result
 
     def get_subscriptions_by_user(
         self, sub_user: str
-    ) -> Optional[List[Dict[str, Any]]]:
+    ) -> Optional[List[Subscription]]:
         """
         根据 sub_user 获取其订阅的UP主列表。
         sub_user: 订阅用户的唯一标识, 形如 "aipcqhttp:GroupMessage:123456"
         """
         return self.get_all_subscriptions().get(sub_user)
 
-    def get_subscription(self, sub_user: str, uid: int) -> Optional[Dict[str, Any]]:
+    def _get_subscription_entry(
+        self, sub_user: str, uid: int
+    ) -> Tuple[Optional[Subscription], Optional[int]]:
+        user_subs = self.data.get("bili_sub_list", {}).get(sub_user)
+        if not user_subs:
+            return None, None
+        for idx, sub in enumerate(user_subs):
+            if str(sub.get("uid")) == str(uid):
+                return Subscription.from_dict(sub), idx
+        return None, None
+
+    def get_subscription(self, sub_user: str, uid: int) -> Optional[Subscription]:
         """
         获取特定用户对特定UP主的订阅信息。
         """
-        user_subs = self.get_subscriptions_by_user(sub_user)
-        if user_subs:
-            for sub in user_subs:
-                if sub.get("uid") == str(uid) or sub.get("uid") == uid:
-                    return sub
-        return None
+        subscription, _ = self._get_subscription_entry(sub_user, uid)
+        return subscription
 
-    async def add_subscription(self, sub_user: str, sub_data: Dict[str, Any]):
+    def _replace_subscription(
+        self, sub_user: str, index: int, subscription: Subscription
+    ) -> None:
+        self.data.setdefault("bili_sub_list", {}).setdefault(sub_user, [])
+        self.data["bili_sub_list"][sub_user][index] = subscription.to_dict()
+
+    async def add_subscription(self, sub_user: str, subscription: Subscription):
         """
         为用户添加一条新的订阅。
         """
-        all_subs = self.get_all_subscriptions()
-        if sub_user not in all_subs:
-            all_subs[sub_user] = []
-
-        all_subs[sub_user].append(sub_data)
+        subscription.ensure_cache_limit()
+        bili_sub_list = self.data.setdefault("bili_sub_list", {})
+        bili_sub_list.setdefault(sub_user, [])
+        bili_sub_list[sub_user].append(subscription.to_dict())
         await self.save()
 
     async def update_subscription(
@@ -88,10 +104,11 @@ class DataManager:
         """
         更新一个已存在的订阅的过滤条件。
         """
-        sub = self.get_subscription(sub_user, uid)
-        if sub:
-            sub["filter_types"] = filter_types
-            sub["filter_regex"] = filter_regex
+        subscription, index = self._get_subscription_entry(sub_user, uid)
+        if subscription is not None and index is not None:
+            subscription.filter_types = list(filter_types)
+            subscription.filter_regex = list(filter_regex)
+            self._replace_subscription(sub_user, index, subscription)
             await self.save()
             return True
         return False
@@ -100,46 +117,42 @@ class DataManager:
         """
         更新订阅的最新动态ID。
         """
-        sub = self.get_subscription(sub_user, uid)
-        if sub:
-            sub["last"] = dyn_id
-            history = sub.setdefault("recent_ids", [])
-            if dyn_id:
-                if dyn_id in history:
-                    history.remove(dyn_id)
-                history.insert(0, dyn_id)
-                if len(history) > RECENT_DYNAMIC_CACHE:
-                    del history[RECENT_DYNAMIC_CACHE:]
+        subscription, index = self._get_subscription_entry(sub_user, uid)
+        if subscription is not None and index is not None:
+            subscription.record_dynamic(dyn_id)
+            self._replace_subscription(sub_user, index, subscription)
             await self.save()
 
     async def update_live_status(self, sub_user: str, uid: int, is_live: bool):
         """
         更新特定订阅的直播状态。
         """
-        sub = self.get_subscription(sub_user, uid)
-        if sub:
-            sub["is_live"] = is_live
+        subscription, index = self._get_subscription_entry(sub_user, uid)
+        if subscription is not None and index is not None:
+            subscription.is_live = is_live
+            self._replace_subscription(sub_user, index, subscription)
             await self.save()
 
     async def remove_subscription(self, sub_user: str, uid: int) -> bool:
         """
         移除一条订阅。
         """
-        user_subs = self.get_subscriptions_by_user(sub_user)
+        bili_sub_list = self.data.get("bili_sub_list", {})
+        user_subs = bili_sub_list.get(sub_user)
         if not user_subs:
             return False
 
-        sub_to_remove = None
-        for sub in user_subs:
-            if sub.get("uid") == uid:
-                sub_to_remove = sub
+        idx_to_remove = None
+        for idx, sub in enumerate(user_subs):
+            if str(sub.get("uid")) == str(uid):
+                idx_to_remove = idx
                 break
 
-        if sub_to_remove:
-            user_subs.remove(sub_to_remove)
+        if idx_to_remove is not None:
+            user_subs.pop(idx_to_remove)
             # 如果该用户已无任何订阅，可以选择移除该用户键
             if not user_subs:
-                del self.data["bili_sub_list"][sub_user]
+                bili_sub_list.pop(sub_user, None)
             await self.save()
             return True
 

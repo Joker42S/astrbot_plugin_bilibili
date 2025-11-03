@@ -1,7 +1,7 @@
 import re
 import asyncio
 import traceback
-from typing import Dict, Any, Tuple
+from typing import Dict, Any
 from astrbot.api import logger
 from astrbot.api.message_components import Image, Plain, Node
 from astrbot.api.event import MessageEventResult, MessageChain
@@ -11,6 +11,7 @@ from .bili_client import BiliClient
 from .renderer import Renderer
 from .utils import *
 from .constant import LOGO_PATH
+from .subscription import Subscription
 
 
 class DynamicListener:
@@ -45,25 +46,25 @@ class DynamicListener:
 
             all_subs = self.data_manager.get_all_subscriptions()
             for sub_user, sub_list in all_subs.items():
-                for sub_data in sub_list:
+                for subscription in sub_list:
                     try:
-                        await self._check_single_up(sub_user, sub_data)
+                        await self._check_single_up(sub_user, subscription)
                     except Exception as e:
                         logger.error(
-                            f"处理订阅者 {sub_user} 的 UP主 {sub_data.get('uid', '未知UID')} 时发生未知错误: {e}\n{traceback.format_exc()}"
+                            f"处理订阅者 {sub_user} 的 UP主 {getattr(subscription, 'uid', '未知UID')} 时发生未知错误: {e}\n{traceback.format_exc()}"
                         )
             await asyncio.sleep(60 * self.interval_mins)
 
-    async def _check_single_up(self, sub_user: str, sub_data: Dict[str, Any]):
+    async def _check_single_up(self, sub_user: str, subscription: Subscription):
         """检查单个订阅的UP主是否有更新。"""
-        uid = sub_data.get("uid")
+        uid = subscription.uid
         if not uid:
             return
 
         # 检查动态更新
         dyn = await self.bili_client.get_latest_dynamics(uid)
         if dyn:
-            result_list = await self._parse_and_filter_dynamics(dyn, sub_data)
+            result_list = await self._parse_and_filter_dynamics(dyn, subscription)
             sent = 0
             for render_data, dyn_id in reversed(result_list):
                 if render_data:
@@ -80,11 +81,11 @@ class DynamicListener:
                     )
 
         # 检查直播状态
-        if "live" in sub_data.get("filter_types", []):
+        if "live" in subscription.filter_types:
             return
         lives = await self.bili_client.get_live_info(uid)
         if lives:
-            await self._handle_live_status(sub_user, sub_data, lives)
+            await self._handle_live_status(sub_user, subscription, lives)
 
     def _compose_plain_dynamic(
         self, render_data: Dict[str, Any], render_fail: bool = False
@@ -148,9 +149,11 @@ class DynamicListener:
                 ls = self._compose_plain_dynamic(render_data, render_fail=True)
                 await self._send_dynamic(sub_user, ls, send_node=True)
 
-    async def _handle_live_status(self, sub_user: str, sub_data: Dict, live_info: Dict):
+    async def _handle_live_status(
+        self, sub_user: str, subscription: Subscription, live_info: Dict
+    ):
         """处理并发送直播状态变更通知。"""
-        is_live = sub_data.get("is_live", False)
+        is_live = subscription.is_live
         live_room = (
             live_info.get("live_room", {}) or live_info.get("live_room:", {}) or {}
         )
@@ -168,10 +171,12 @@ class DynamicListener:
 
         if live_room.get("liveStatus", "") and not is_live:
             render_data["text"] = f"📣 你订阅的UP 「{user_name}」 开播了！"
-            await self.data_manager.update_live_status(sub_user, sub_data["uid"], True)
+            await self.data_manager.update_live_status(sub_user, subscription.uid, True)
+            subscription.is_live = True
         if not live_room.get("liveStatus", "") and is_live:
             render_data["text"] = f"📣 你订阅的UP 「{user_name}」 下播了！"
-            await self.data_manager.update_live_status(sub_user, sub_data["uid"], False)
+            await self.data_manager.update_live_status(sub_user, subscription.uid, False)
+            subscription.is_live = False
         if render_data["text"]:
             render_data["qrcode"] = await create_qrcode(link)
             img_path = await self.renderer.render_dynamic(render_data)
@@ -190,12 +195,9 @@ class DynamicListener:
                     .url_image(cover_url),
                 )
 
-    async def _get_dynamic_items(self, dyn: Dict, data: Dict):
+    async def _get_dynamic_items(self, dyn: Dict, subscription: Subscription):
         """获取动态条目列表。"""
-        last = data["last"]
-        items = dyn["items"]
-        recent_ids = data.get("recent_ids", []) or []
-        known_ids = {x for x in ([last] + recent_ids) if x}
+        items = (dyn or {}).get("items") or []
         new_items = []
 
         for item in items:
@@ -207,24 +209,26 @@ class DynamicListener:
                 and item["modules"]["module_tag"].get("text") == "置顶"
             ):
                 continue
-
-            if item["id_str"] in known_ids:
+            dyn_id = item["id_str"]
+            if subscription.is_known(dyn_id):
                 break
             new_items.append(item)
 
         return new_items
 
-    async def _parse_and_filter_dynamics(self, dyn: Dict, data: Dict):
+    async def _parse_and_filter_dynamics(
+        self, dyn: Dict, subscription: Subscription
+    ):
         """
         解析并过滤动态。
         """
-        filter_types = data.get("filter_types", [])
-        filter_regex = data.get("filter_regex", [])
-        items = await self._get_dynamic_items(dyn, data)  # 不含last及置顶的动态列表
+        filter_types = subscription.filter_types or []
+        filter_regex = subscription.filter_regex or []
+        items = await self._get_dynamic_items(dyn, subscription)    # 不含last及置顶的动态列表
         result_list = []
         # 无新动态
         if not items:
-            result_list.append((None, None))
+            return result_list
 
         for item in items:
             dyn_id = item["id_str"]
@@ -330,6 +334,6 @@ class DynamicListener:
                 render_data = await self.renderer.build_render_data(item)
                 result_list.append((render_data, dyn_id))
             else:
-                result_list.append((None, None))
+                result_list.append((None, dyn_id))
 
         return result_list

@@ -23,7 +23,8 @@ from .renderer import Renderer
 from .bili_client import BiliClient
 from .listener import DynamicListener
 from .data_manager import DataManager
-from .constant import VALID_FILTER_TYPES, BV, LOGO_PATH
+from .constant import VALID_FILTER_TYPES, BV, LOGO_PATH, RECENT_DYNAMIC_CACHE
+from .subscription import Subscription
 from .tools.bangumi import BangumiTool
 
 
@@ -109,25 +110,23 @@ class Main(Star):
         if not uid.isdigit():
             return MessageEventResult().message("UID 格式错误")
 
+        uid_int = int(uid)
+        subscription = Subscription(
+            uid=uid_int,
+            filter_types=list(filter_types),
+            filter_regex=list(filter_regex),
+        )
+
         # 检查是否已经存在该订阅
         if await self.data_manager.update_subscription(
-            sub_user, int(uid), filter_types, filter_regex
+            sub_user, uid_int, filter_types, filter_regex
         ):
             # 如果已存在，更新其过滤条件
             return MessageEventResult().message("该动态已订阅，已更新过滤条件。")
         # 以下为新增订阅
         try:
-            # 构造新的订阅数据结构
-            _sub_data = {
-                "uid": int(uid),
-                "last": "",
-                "is_live": False,
-                "filter_types": filter_types,
-                "filter_regex": filter_regex,
-                "recent_ids": [],
-            }
             # 获取用户信息
-            usr_info, msg = await self.bili_client.get_user_info(int(uid))
+            usr_info, msg = await self.bili_client.get_user_info(uid_int)
             if not usr_info:
                 return MessageEventResult().message(msg)
 
@@ -136,17 +135,23 @@ class Main(Star):
             sex = usr_info["sex"]
             avatar = usr_info["face"]
             # 获取最新一条动态 (用于初始化 last_id)
-            dyn = await self.bili_client.get_latest_dynamics(int(uid))
-            _, dyn_id = (
-                await self.dynamic_listener._parse_and_filter_dynamics(dyn, _sub_data)
-            )[0]
-            _sub_data["last"] = dyn_id  # 更新 last id
-            _sub_data["recent_ids"] = [dyn_id]
+            dyn = await self.bili_client.get_latest_dynamics(uid_int)
+            if dyn:
+                cached_ids = []
+                for item in dyn.get("items", []):
+                    dyn_id = item.get("id_str")
+                    if dyn_id:
+                        cached_ids.append(dyn_id)
+                    if len(cached_ids) >= RECENT_DYNAMIC_CACHE:
+                        break
+                if cached_ids:
+                    for dyn_id in reversed(cached_ids):
+                        subscription.record_dynamic(dyn_id)
         except Exception as e:
             logger.error(f"获取 {name} 初始动态失败: {e}")
         finally:
             # 保存配置
-            await self.data_manager.add_subscription(sub_user, _sub_data)
+            await self.data_manager.add_subscription(sub_user, subscription)
 
         try:
             filter_desc = ""
@@ -199,8 +204,8 @@ class Main(Star):
         if not subs:
             return MessageEventResult().message("无订阅")
         else:
-            for idx, uid_sub_data in enumerate(subs):
-                uid = uid_sub_data["uid"]
+            for idx, subscription in enumerate(subs):
+                uid = subscription.uid
                 info, _ = await self.bili_client.get_user_info(int(uid))
                 if not info:
                     ret += f"{idx + 1}. {uid} - 无法获取 UP 主信息\n"
@@ -254,36 +259,41 @@ class Main(Star):
             else:
                 filter_regex.append(arg)
 
+        uid_int = int(uid)
         if await self.data_manager.update_subscription(
-            sid, int(uid), filter_types, filter_regex
+            sid, uid_int, filter_types, filter_regex
         ):
             return MessageEventResult().message("该动态已订阅，已更新过滤条件")
 
-        try:
-            _sub_data = {
-                "uid": int(uid),
-                "last": "",
-                "is_live": False,
-                "filter_types": filter_types,
-                "filter_regex": filter_regex,
-                "recent_ids": [],
-            }
+        subscription = Subscription(
+            uid=uid_int,
+            filter_types=list(filter_types),
+            filter_regex=list(filter_regex),
+        )
 
-            usr_info, msg = await self.bili_client.get_user_info(int(uid))
+        try:
+
+            usr_info, msg = await self.bili_client.get_user_info(uid_int)
             if not usr_info:
                 return MessageEventResult().message(msg)
 
-            dyn = await self.bili_client.get_latest_dynamics(int(uid))
-            _, dyn_id = (
-                await self.dynamic_listener._parse_and_filter_dynamics(dyn, _sub_data)
-            )[0]
-            _sub_data["last"] = dyn_id
-            _sub_data["recent_ids"] = [dyn_id]
+            dyn = await self.bili_client.get_latest_dynamics(uid_int)
+            if dyn:
+                cached_ids = []
+                for item in dyn.get("items", []):
+                    dyn_id = item.get("id_str")
+                    if dyn_id:
+                        cached_ids.append(dyn_id)
+                    if len(cached_ids) >= RECENT_DYNAMIC_CACHE:
+                        break
+                if cached_ids:
+                    for dyn_id in reversed(cached_ids):
+                        subscription.record_dynamic(dyn_id)
         except Exception as e:
             logger.error(f"获取 {usr_info['name']} 初始动态失败: {e}")
         finally:
             # 保存配置
-            await self.data_manager.add_subscription(sid, _sub_data)
+            await self.data_manager.add_subscription(sid, subscription)
 
         return MessageEventResult().message(
             f"已向配置文件添加{sid}订阅{uid}，详情见日志。"
@@ -301,7 +311,7 @@ class Main(Star):
         for sub_user in all_subs:
             ret += f"- {sub_user}\n"
             for sub in all_subs[sub_user]:
-                uid = sub.get("uid")
+                uid = sub.uid
                 ret += f"  - {uid}\n"
         return MessageEventResult().message(ret)
 
@@ -347,21 +357,21 @@ class Main(Star):
     async def sub_test(self, event: AstrMessageEvent, uid: str):
         """测试订阅功能。仅测试获取动态与渲染图片功能，不保存订阅信息。"""
         sub_user = event.unified_msg_origin
-        dyn = await self.bili_client.get_latest_dynamics(int(uid))
+        if not uid.isdigit():
+            return
+        uid_int = int(uid)
+        dyn = await self.bili_client.get_latest_dynamics(uid_int)
         if dyn:
-            render_data, _ = (
-                await self.dynamic_listener._parse_and_filter_dynamics(
-                    dyn,
-                    {
-                        "uid": uid,
-                        "filter_types": [],
-                        "filter_regex": [],
-                        "last": "",
-                        "recent_ids": [],
-                    },
-                )
-            )[0]
-            await self.dynamic_listener._handle_new_dynamic(sub_user, render_data)
+            temp_subscription = Subscription(uid=uid_int)
+            result_list = await self.dynamic_listener._parse_and_filter_dynamics(
+                dyn, temp_subscription
+            )
+            for render_data, _ in result_list:
+                if render_data:
+                    await self.dynamic_listener._handle_new_dynamic(
+                        sub_user, render_data
+                    )
+                    break
 
     async def terminate(self):
         if self.dynamic_listener_task and not self.dynamic_listener_task.done():
