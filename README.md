@@ -91,6 +91,12 @@ UMO结构发生了变化，已为"全局列表"指令添加了具体订阅信息
 
 ## 更新日志
 
+### v1.4.14
+
+- 清除了v1.4.8添加的自部署t2i接口相关代码，完全应用上游接口。详见AstrBot PR[#1947](https://github.com/AstrBotDevs/AstrBot/pull/1947)。统一自部署t2i接口配置项到"配置文件-系统配置-文本转图像服务 API 地址"
+- 引入动态缓存，尽量保证有效动态推送且仅推送一次
+- ‼️astrbot_plugin_bilibili >= v1.4.14 需要 Astrbot >= 4.5.2；原因是使用了Astrbot >= 4.5.2推荐的函数调用写法，而Astrbot >= 4.5.3修复了webui工具显示错误，推荐升级到Astrbot >= 4.5.3
+
 ### v1.4.13
 
 - 新增logo

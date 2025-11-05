@@ -1,3 +1,9 @@
+### v1.4.14
+
+- 清除了v1.4.8添加的自部署t2i接口相关代码，完全应用上游接口。详见AstrBot PR[#1947](https://github.com/AstrBotDevs/AstrBot/pull/1947)。统一自部署t2i接口配置项到"配置文件-系统配置-文本转图像服务 API 地址"
+- 修复了正则匹配时妨碍正常推送的问题
+- ‼️astrbot_plugin_bilibili >= v1.4.14 需要 Astrbot >= 4.5.2；使用了Astrbot >= 4.5.2推荐的函数调用写法，而Astrbot >= 4.5.3修复了webui工具显示错误推荐升级到Astrbot >= 4.5.3
+
 ### v1.4.13
 
 - 新增logo
