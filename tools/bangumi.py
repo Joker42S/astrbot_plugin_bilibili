@@ -1,6 +1,9 @@
+from mcp.types import CallToolResult
+from pydantic import Field
 from astrbot.api import FunctionTool
-from astrbot.api.event import AstrMessageEvent
-from dataclasses import dataclass, field
+from astrbot.core.agent.run_context import ContextWrapper
+from astrbot.core.astr_agent_context import AstrAgentContext
+from pydantic.dataclasses import dataclass
 from ..constant import category_mapping
 from bilibili_api import bangumi
 from bilibili_api.bangumi import IndexFilter as IF
@@ -13,7 +16,7 @@ class BangumiTool(FunctionTool):
     description: str = (
         "当用户希望推荐番剧时调用。根据用户的描述获取前 5 条推荐的动漫番剧。"
     )
-    parameters: dict = field(
+    parameters: dict = Field(
         default_factory=lambda: {
             "type": "object",
             "properties": {
@@ -37,14 +40,14 @@ class BangumiTool(FunctionTool):
         }
     )
 
-    async def run(
+    async def call(
         self,
-        event: AstrMessageEvent,
+        context: ContextWrapper[AstrAgentContext],
         style: str = "",
         season: str = "",
         start_year: Optional[int] = None,
         end_year: Optional[int] = None,
-    ):
+    ) -> str | CallToolResult:
         if style in category_mapping:
             style = getattr(IF.Style.Anime, category_mapping[style], IF.Style.Anime.ALL)
         else:
