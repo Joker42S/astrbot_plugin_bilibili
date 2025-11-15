@@ -24,12 +24,41 @@ class Renderer:
         self.star = star_instance
         self.rai = rai
 
+    async def _cleanup_temp_images(self, max_age_seconds: int = 259200) -> None:
+        """Remove expired temp images"""
+        if not os.path.isdir(TEMP_DIR):
+            return
+        now_ms = int(time.time() * 1000)
+        expiry_ms = now_ms - max_age_seconds * 1000
+
+        for filename in os.listdir(TEMP_DIR):
+            if not filename.startswith("dynamic_") or not filename.endswith(".png"):
+                continue
+            parts = filename.split("_")
+            if len(parts) < 3:
+                continue
+            try:
+                timestamp_ms = int(parts[1])
+            except ValueError:
+                continue
+            if timestamp_ms > expiry_ms:
+                continue
+            file_path = os.path.join(TEMP_DIR, filename)
+            if not os.path.isfile(file_path):
+                continue
+
+            try:
+                os.remove(file_path)
+            except OSError as exc:
+                logger.warning(f"清理临时图片失败: {file_path}: {exc}")
+
     async def render_dynamic(self, render_data: Dict[str, Any]):
         """
         将渲染数据字典渲染成最终图片。
         这是该类的主要入口方法。
         """
         os.makedirs(TEMP_DIR, exist_ok=True)
+        await self._cleanup_temp_images()
         options = {"full_page": True, "type": "png", "quality": None, "scale": "device"}
         for attempt in range(1, MAX_ATTEMPTS + 1):
             render_output = None
