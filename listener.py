@@ -82,7 +82,8 @@ class DynamicListener:
         # 检查直播状态
         if "live" in sub_data.get("filter_types", []):
             return
-        lives = await self.bili_client.get_live_info(uid)
+        # lives = await self.bili_client.get_live_info(uid)
+        lives = await self.bili_client.get_live_info_by_uids([uid])
         if lives:
             await self._handle_live_status(sub_user, sub_data, lives)
 
@@ -148,16 +149,15 @@ class DynamicListener:
                 ls = self._compose_plain_dynamic(render_data, render_fail=True)
                 await self._send_dynamic(sub_user, ls, send_node=True)
 
-    async def _handle_live_status(self, sub_user: str, sub_data: Dict, live_info: Dict):
+    async def _handle_live_status(self, sub_user: str, sub_data: Dict, live_room: Dict):
         """处理并发送直播状态变更通知。"""
         is_live = sub_data.get("is_live", False)
-        live_room = (
-            live_info.get("live_room", {}) or live_info.get("live_room:", {}) or {}
-        )
+
         live_name = live_room.get("title", "Unknown")
-        user_name = live_info["name"]
-        cover_url = live_room.get("cover", "")
-        link = live_room.get("url", "Unknown")
+        user_name = live_room.get("uname", "Unknown")
+        cover_url = live_room.get("cover_from_user", "")
+        room_id = live_room.get("room_id", 0)
+        link = f"https://live.bilibili.com/{room_id}"
 
         render_data = await create_render_data()
         render_data["name"] = "AstrBot"
@@ -166,10 +166,10 @@ class DynamicListener:
         render_data["url"] = link
         render_data["image_urls"] = [cover_url]
 
-        if live_room.get("liveStatus", "") and not is_live:
+        if live_room.get("live_status", "") == 1 and not is_live:
             render_data["text"] = f"📣 你订阅的UP 「{user_name}」 开播了！"
             await self.data_manager.update_live_status(sub_user, sub_data["uid"], True)
-        if not live_room.get("liveStatus", "") and is_live:
+        if live_room.get("live_status", "") == 0 and is_live:
             render_data["text"] = f"📣 你订阅的UP 「{user_name}」 下播了！"
             await self.data_manager.update_live_status(sub_user, sub_data["uid"], False)
         if render_data["text"]:
