@@ -54,13 +54,26 @@ class Main(Star):
     @regex(BV)
     async def get_video_info(self, event: AstrMessageEvent):
         if self.enable_parse_BV:
-            if len(event.message_str) == 12:
-                bvid = event.message_str
-            else:
-                match_ = re.search(BV, event.message_str, re.IGNORECASE)
-                if not match_:
+            match_ = re.search(BV, event.message_str, re.IGNORECASE)
+            if not match_:
+                return
+            # 匹配到短链接
+            if match_.group(2):
+                full_link = match_.group(0)
+                converted_url = await self.bili_client.b23_to_bv(full_link)
+                if not converted_url:
                     return
-                bvid = "BV" + match_.group(1)[2:]
+                match_bv = re.search(r"(BV[a-zA-Z0-9]+)", converted_url, re.IGNORECASE)
+                if match_bv:
+                    bvid = match_bv.group(1)
+                else:
+                    return
+            # 匹配到长链接
+            elif match_.group(1):
+                bvid = match_.group(1)
+            # 匹配到纯 BV 号
+            elif match_.group(0):
+                bvid = match_.group(0)
 
             video_data = await self.bili_client.get_video_info(bvid=bvid)
             if not video_data:

@@ -2,7 +2,7 @@ import os
 
 CURRENT_DIR = os.path.dirname(__file__)
 LOGO_PATH = os.path.join(CURRENT_DIR, "Astrbot.png")
-BV = r"(?:\?.*)?(?:https?:\/\/)?(?:www\.)?bilibili\.com\/video\/(BV[\w\d]+)\/?(?:\?.*)?|BV[\w\d]+"
+BV = r"(?:\?.*)?(?:https?:\/\/)?(?:www\.)?(?:bilibili\.com\/video\/(BV[a-zA-Z0-9]+)|b23\.tv\/([a-zA-Z0-9]+))\/?(?:\?.*)?|BV[a-zA-Z0-9]+"
 VALID_FILTER_TYPES = {"forward", "lottery", "video", "article", "draw", "live"}
 DATA_PATH = "data/astrbot_plugin_bilibili.json"
 DEFAULT_CFG = {
