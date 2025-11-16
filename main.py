@@ -1,4 +1,3 @@
-from ast import alias
 import re
 import json
 import asyncio
@@ -141,7 +140,15 @@ class Main(Star):
                 "filter_regex": filter_regex,
                 "recent_ids": [],
             }
-            # 获取用户信息
+            # 获取最新一条动态 (用于初始化 last_id)
+            dyn = await self.bili_client.get_latest_dynamics(int(uid))
+            _, dyn_id = (
+                await self.dynamic_listener._parse_and_filter_dynamics(dyn, _sub_data)
+            )[0]
+            _sub_data["last"] = dyn_id  # 更新 last id
+            _sub_data["recent_ids"] = [dyn_id]
+
+            # 获取用户信息(可能412，故后置)
             usr_info, msg = await self.bili_client.get_user_info(int(uid))
             if not usr_info:
                 return MessageEventResult().message(msg)
@@ -150,13 +157,6 @@ class Main(Star):
             name = usr_info["name"]
             sex = usr_info["sex"]
             avatar = usr_info["face"]
-            # 获取最新一条动态 (用于初始化 last_id)
-            dyn = await self.bili_client.get_latest_dynamics(int(uid))
-            _, dyn_id = (
-                await self.dynamic_listener._parse_and_filter_dynamics(dyn, _sub_data)
-            )[0]
-            _sub_data["last"] = dyn_id  # 更新 last id
-            _sub_data["recent_ids"] = [dyn_id]
         except Exception as e:
             logger.error(f"获取 {name} 初始动态失败: {e}")
         finally:
@@ -284,16 +284,16 @@ class Main(Star):
                 "recent_ids": [],
             }
 
-            usr_info, msg = await self.bili_client.get_user_info(int(uid))
-            if not usr_info:
-                return MessageEventResult().message(msg)
-
             dyn = await self.bili_client.get_latest_dynamics(int(uid))
             _, dyn_id = (
                 await self.dynamic_listener._parse_and_filter_dynamics(dyn, _sub_data)
             )[0]
             _sub_data["last"] = dyn_id
             _sub_data["recent_ids"] = [dyn_id]
+
+            usr_info, msg = await self.bili_client.get_user_info(int(uid))
+            if not usr_info:
+                return MessageEventResult().message(msg)
         except Exception as e:
             logger.error(f"获取 {usr_info['name']} 初始动态失败: {e}")
         finally:
