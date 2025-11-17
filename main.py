@@ -148,20 +148,21 @@ class Main(Star):
             _sub_data["last"] = dyn_id  # 更新 last id
             _sub_data["recent_ids"] = [dyn_id]
 
-            # 获取用户信息(可能412，故后置)
+        except Exception as e:
+            logger.error(f"获取初始动态失败: {e}")
+        finally:
+            # 保存配置
+            await self.data_manager.add_subscription(sub_user, _sub_data)
+        # 获取用户信息(可能412，故后置)
+        try:
             usr_info, msg = await self.bili_client.get_user_info(int(uid))
-            if not usr_info:
-                return MessageEventResult().message(msg)
 
             mid = usr_info["mid"]
             name = usr_info["name"]
             sex = usr_info["sex"]
             avatar = usr_info["face"]
         except Exception as e:
-            logger.error(f"获取 {name} 初始动态失败: {e}")
-        finally:
-            # 保存配置
-            await self.data_manager.add_subscription(sub_user, _sub_data)
+            logger.error(f"获取用户信息失败: {e}")
 
         try:
             filter_desc = ""
@@ -202,7 +203,7 @@ class Main(Star):
                 ]
                 return MessageEventResult(chain=chain, use_t2i_=False)
         except Exception as e:
-            return MessageEventResult().message("订阅出错，仅保存配置，详情见日志。")
+            return MessageEventResult().message(f"订阅完成，已保存配置，额外信息:{msg}")
 
     @command("订阅列表", alias={"bili_sub_list"})
     async def sub_list(self, event: AstrMessageEvent):
@@ -292,17 +293,17 @@ class Main(Star):
             _sub_data["recent_ids"] = [dyn_id]
 
             usr_info, msg = await self.bili_client.get_user_info(int(uid))
-            if not usr_info:
-                return MessageEventResult().message(msg)
         except Exception as e:
             logger.error(f"获取 {usr_info['name']} 初始动态失败: {e}")
         finally:
             # 保存配置
             await self.data_manager.add_subscription(sid, _sub_data)
-
-        return MessageEventResult().message(
-            f"已向配置文件添加{sid}订阅{uid}，详情见日志。"
-        )
+            if not usr_info:
+                return MessageEventResult().message(msg)
+            else:
+                return MessageEventResult().message(
+                    f"订阅完成，已为{sid}添加订阅{uid}，详情见日志。"
+                )
 
     @permission_type(PermissionType.ADMIN)
     @command("全局列表", alias={"bili_global_list"})
