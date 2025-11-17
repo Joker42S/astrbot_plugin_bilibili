@@ -165,11 +165,11 @@ class DynamicListener:
         render_data["title"] = live_name
         render_data["url"] = link
         render_data["image_urls"] = [cover_url]
-
+        # live_status: 0：未开播    1：正在直播     2：轮播中
         if live_room.get("live_status", "") == 1 and not is_live:
             render_data["text"] = f"📣 你订阅的UP 「{user_name}」 开播了！"
             await self.data_manager.update_live_status(sub_user, sub_data["uid"], True)
-        if live_room.get("live_status", "") == 0 and is_live:
+        if live_room.get("live_status", "") != 1 and is_live:
             render_data["text"] = f"📣 你订阅的UP 「{user_name}」 下播了！"
             await self.data_manager.update_live_status(sub_user, sub_data["uid"], False)
         if render_data["text"]:
