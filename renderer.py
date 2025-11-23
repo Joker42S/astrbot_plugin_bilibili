@@ -38,7 +38,8 @@ class Renderer:
         将渲染数据字典渲染成最终图片。
         这是该类的主要入口方法。
         """
-        options = {"full_page": True, "type": "png", "quality": None, "scale": "device"}
+        # options = {"full_page": True, "type": "png", "quality": None, "scale": "device"}
+        options = {"full_page": True, "type": "jpeg", "quality": 95, "scale": "device"}
         for attempt in range(1, MAX_ATTEMPTS + 1):
             render_output = None
             try:
