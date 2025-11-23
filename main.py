@@ -22,7 +22,11 @@ from .renderer import Renderer
 from .bili_client import BiliClient
 from .listener import DynamicListener
 from .data_manager import DataManager
-from .constant import VALID_FILTER_TYPES, BV, LOGO_PATH
+from .constant import (
+    VALID_FILTER_TYPES,
+    BV,
+    LOGO_PATH,
+)
 from .tools.bangumi import BangumiTool
 
 
@@ -38,7 +42,8 @@ class Main(Star):
         self.enable_parse_BV = self.cfg.get("enable_parse_BV", True)
 
         self.data_manager = DataManager()
-        self.renderer = Renderer(self, self.rai)
+        template_key = self.cfg.get("renderer_template", "template_2")
+        self.renderer = Renderer(self, self.rai, template_key=template_key)
         self.bili_client = BiliClient(self.cfg.get("sessdata"))
         self.dynamic_listener = DynamicListener(
             context=self.context,
@@ -172,6 +177,7 @@ class Main(Star):
                 filter_desc += f"<br>过滤正则: {filter_regex}"
 
             render_data = await create_render_data()
+            render_data["uid"] = uid
             render_data["name"] = "AstrBot"
             render_data["avatar"] = await image_to_base64(LOGO_PATH)
             render_data["text"] = (

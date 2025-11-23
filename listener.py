@@ -10,7 +10,7 @@ from .data_manager import DataManager
 from .bili_client import BiliClient
 from .renderer import Renderer
 from .utils import *
-from .constant import LOGO_PATH
+from .constant import LOGO_PATH, BANNER_PATH
 
 
 class DynamicListener:
@@ -160,6 +160,7 @@ class DynamicListener:
         link = f"https://live.bilibili.com/{room_id}"
 
         render_data = await create_render_data()
+        render_data["banner"] = await image_to_base64(BANNER_PATH)
         render_data["name"] = "AstrBot"
         render_data["avatar"] = await image_to_base64(LOGO_PATH)
         render_data["title"] = live_name
@@ -220,6 +221,7 @@ class DynamicListener:
         """
         filter_types = data.get("filter_types", [])
         filter_regex = data.get("filter_regex", [])
+        uid = data.get("uid", "")
         items = await self._get_dynamic_items(dyn, data)  # 不含last及置顶的动态列表
         result_list = []
         # 无新动态
@@ -253,6 +255,7 @@ class DynamicListener:
                     if matched:
                         continue
                 render_data = await self.renderer.build_render_data(item)
+                render_data["uid"] = uid
                 render_data["url"] = f"https://t.bilibili.com/{dyn_id}"
                 render_data["qrcode"] = await create_qrcode(render_data["url"])
 
@@ -305,6 +308,7 @@ class DynamicListener:
                     if matched:
                         continue
                 render_data = await self.renderer.build_render_data(item)
+                render_data["uid"] = uid
                 result_list.append((render_data, dyn_id))
             elif item.get("type") == "DYNAMIC_TYPE_AV":
                 # 视频类型过滤
@@ -313,6 +317,7 @@ class DynamicListener:
                     result_list.append((None, dyn_id))
                     continue
                 render_data = await self.renderer.build_render_data(item)
+                render_data["uid"] = uid
                 result_list.append((render_data, dyn_id))
             elif item.get("type") == "DYNAMIC_TYPE_ARTICLE":
                 # 文章类型过滤
@@ -328,6 +333,7 @@ class DynamicListener:
                     result_list.append((None, dyn_id))
                     continue
                 render_data = await self.renderer.build_render_data(item)
+                render_data["uid"] = uid
                 result_list.append((render_data, dyn_id))
             else:
                 result_list.append((None, None))

@@ -18,6 +18,13 @@
         "hint": "是否以图片形式渲染输出(仅对图文动态生效)",
         "default": true
     },
+    "renderer_template": {
+        "description": "renderer_template",
+        "type": "string",
+        "hint": "渲染模板",
+        "options": ["template_1", "template_2"],
+        "default": "template_2"
+    },
     "node": {
         "description": "node",
         "type": "bool",
