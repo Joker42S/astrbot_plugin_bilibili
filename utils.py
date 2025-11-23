@@ -3,6 +3,8 @@ import qrcode
 import io
 import base64
 from urllib.parse import urlparse
+from PIL import Image
+from astrbot.api import logger
 
 
 async def create_render_data() -> dict:
@@ -90,3 +92,20 @@ async def parse_rich_text(summary, topic):
             text = text.replace(topic_info, topic_tag)
 
     return text
+
+
+async def is_height_valid(img_path: str, max_height: int = 30000) -> bool:
+    """
+    检查图片高度是否在允许范围内
+    :param img_path: 图片文件路径
+    :param max_height: 最大允许高度
+    :return: 如果图片高度小于等于max_height则返回True，否则返回False
+    """
+
+    try:
+        with Image.open(img_path) as img:
+            _, height = img.size
+            return height <= max_height
+    except Exception as e:
+        logger.error(f"无法打开图片 {img_path} 进行高度检查: {e}")
+        return False

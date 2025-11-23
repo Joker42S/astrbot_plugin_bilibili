@@ -1,15 +1,15 @@
 import re
 import asyncio
 import traceback
-from typing import Dict, Any, Tuple
+from typing import Dict, Any
 from astrbot.api import logger
-from astrbot.api.message_components import Image, Plain, Node
+from astrbot.api.message_components import Image, Plain, Node, File
 from astrbot.api.event import MessageEventResult, MessageChain
 from astrbot.api.all import *
 from .data_manager import DataManager
 from .bili_client import BiliClient
 from .renderer import Renderer
-from .utils import *
+from .utils import create_render_data, image_to_base64, create_qrcode, is_height_valid
 from .constant import LOGO_PATH, BANNER_PATH
 
 
@@ -134,10 +134,11 @@ class DynamicListener:
             img_path = await self.renderer.render_dynamic(render_data)
             if img_path:
                 url = render_data.get("url", "")
-                ls = [
-                    Image.fromFileSystem(img_path),
-                    Plain(f"{url}"),
-                ]
+                if await is_height_valid(img_path):
+                    ls = [Image.fromFileSystem(img_path)]
+                else:
+                    ls = [File(file=img_path, name="bilibili_dynamic.jpg")]
+                ls.append(Plain(f"\n{url}"))
                 if self.node:
                     await self._send_dynamic(sub_user, ls, send_node=True)
                 else:
