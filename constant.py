@@ -1,15 +1,36 @@
 import os
+from typing import Dict
 
 CURRENT_DIR = os.path.dirname(__file__)
-LOGO_PATH = os.path.join(CURRENT_DIR, "Astrbot.png")
+ASSETS_DIR = os.path.join(CURRENT_DIR, "assets")
+
+
+def _asset_path(*parts: str) -> str:
+    return os.path.join(ASSETS_DIR, *parts)
+
+
+LOGO_PATH = _asset_path("Astrbot.png")
+BANNER_PATH = _asset_path("banner.png")
 BV = r"(?:\?.*)?(?:https?:\/\/)?(?:www\.)?(?:bilibili\.com\/video\/(BV[a-zA-Z0-9]+)|b23\.tv\/([a-zA-Z0-9]+))\/?(?:\?.*)?|BV[a-zA-Z0-9]+"
 VALID_FILTER_TYPES = {"forward", "lottery", "video", "article", "draw", "live"}
 DATA_PATH = "data/astrbot_plugin_bilibili.json"
 DEFAULT_CFG = {
     "bili_sub_list": {}  # sub_user -> [{"uid": "uid", "last": "last_dynamic_id", ...}]
 }
-TEMPLATE_PATH = os.path.join(CURRENT_DIR, "template.html")
-TEMP_DIR = os.path.join(CURRENT_DIR, "temp")
+
+
+def _discover_templates() -> Dict[str, str]:
+    templates: Dict[str, str] = {}
+    if os.path.isdir(ASSETS_DIR):
+        for filename in os.listdir(ASSETS_DIR):
+            if filename.lower().endswith(".html"):
+                name, _ = os.path.splitext(filename)
+                templates[name] = os.path.join(ASSETS_DIR, filename)
+    return templates
+
+
+TEMPLATES = _discover_templates()
+
 MAX_ATTEMPTS = 3
 RETRY_DELAY = 2
 RECENT_DYNAMIC_CACHE = 4

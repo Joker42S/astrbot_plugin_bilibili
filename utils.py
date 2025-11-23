@@ -1,10 +1,7 @@
 from astrbot.api.all import *
-import PIL
-import aiohttp
 import qrcode
 import io
 import base64
-import os
 from urllib.parse import urlparse
 
 
@@ -58,23 +55,6 @@ async def create_qrcode(url):
     qr_image = qr.make_image(fill_color="#EC88EC", back_color="#F2F6FF")
     url = await image_to_base64(qr_image)
     return url
-
-
-async def get_and_crop_image(src, output_path, width=700):
-    if src.startswith(("http://", "https://")):
-        async with aiohttp.ClientSession() as session:
-            async with session.get(src, timeout=10) as response:
-                if response.status != 200:
-                    return
-                data = await response.read()
-                image = PIL.Image.open(io.BytesIO(data))
-    else:
-        if not os.path.exists(src):
-            return
-        image = PIL.Image.open(src)
-    w, h = image.size
-    cropped = image.crop((0, 0, min(width, w), h))
-    cropped.save(output_path)
 
 
 def is_valid_url(url: str) -> bool:
