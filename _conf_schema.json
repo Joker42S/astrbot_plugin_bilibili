@@ -22,7 +22,7 @@
         "description": "renderer_template",
         "type": "string",
         "hint": "渲染模板",
-        "options": ["template_1", "template_2"],
+        "options": ["template_1", "template_2", "simple"],
         "default": "template_2"
     },
     "node": {

@@ -5,3 +5,4 @@ pycryptodomex~=3.23.0
 brotli~=1.1.0
 qrcode~=8.2
 qrcode_terminal~=0.8
+jinja2>=3.0.0

@@ -9,8 +9,17 @@ from .constant import (
     BANNER_PATH,
     MAX_ATTEMPTS,
     RETRY_DELAY,
-    TEMPLATES,
+    CARD_TEMPLATES,
+    DEFAULT_TEMPLATE,
+    get_template_path,
 )
+
+
+def load_template(style: str) -> str:
+    """加载指定样式的模板内容"""
+    path = get_template_path(style)
+    with open(path, "r", encoding="utf-8") as f:
+        return f.read()
 
 
 class Renderer:
@@ -18,33 +27,52 @@ class Renderer:
     负责将动态数据渲染成图片。
     """
 
-    def __init__(self, star_instance: Star, rai: bool, template_key: str):
+    def __init__(self, star_instance: Star, rai: bool, style: str = DEFAULT_TEMPLATE):
         """
         初始化渲染器。
         """
         self.star = star_instance
         self.rai = rai
-        self.template_key = template_key
-        self.html_template = self._load_template(self.template_key)
+        self.style = style
+        # 预加载所有模板
+        self._templates: Dict[str, str] = {}
+        self._load_all_templates()
 
-    def _load_template(self, template_key: str) -> str:
-        """加载指定的 HTML 模板。"""
-        template_path = TEMPLATES.get(template_key)
-        with open(template_path, "r", encoding="utf-8") as file:
-            return file.read()
+    def _load_all_templates(self):
+        """预加载所有注册的模板"""
+        for template_id in CARD_TEMPLATES:
+            try:
+                self._templates[template_id] = load_template(template_id)
+            except Exception as e:
+                logger.warning(f"加载模板 {template_id} 失败: {e}")
 
-    async def render_dynamic(self, render_data: Dict[str, Any]):
+    def reload_templates(self):
+        """重新加载所有模板（用于热更新）"""
+        self._templates.clear()
+        self._load_all_templates()
+
+    def get_template(self, style: str = None) -> str:
+        """获取指定样式的模板内容"""
+        target_style = style or self.style
+        if target_style not in self._templates:
+            target_style = DEFAULT_TEMPLATE
+        return self._templates.get(target_style, "")
+
+    async def render_dynamic(self, render_data: Dict[str, Any], style: str = None):
         """
         将渲染数据字典渲染成最终图片。
         这是该类的主要入口方法。
         """
         # options = {"full_page": True, "type": "png", "quality": None, "scale": "device"}
         options = {"full_page": True, "type": "jpeg", "quality": 95, "scale": "device"}
+
+        tmpl = self.get_template(style)
+
         for attempt in range(1, MAX_ATTEMPTS + 1):
             render_output = None
             try:
                 render_output = await self.star.html_render(
-                    tmpl=self.html_template,
+                    tmpl=tmpl,
                     data=render_data,
                     return_url=False,
                     options=options,

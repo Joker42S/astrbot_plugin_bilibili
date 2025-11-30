@@ -18,18 +18,45 @@ DEFAULT_CFG = {
     "bili_sub_list": {}  # sub_user -> [{"uid": "uid", "last": "last_dynamic_id", ...}]
 }
 
+# ==================== 模板注册表 ====================
+# 集中管理所有可用的卡片模板
+# 添加新模板只需在此处注册即可
 
-def _discover_templates() -> Dict[str, str]:
-    templates: Dict[str, str] = {}
-    if os.path.isdir(ASSETS_DIR):
-        for filename in os.listdir(ASSETS_DIR):
-            if filename.lower().endswith(".html"):
-                name, _ = os.path.splitext(filename)
-                templates[name] = os.path.join(ASSETS_DIR, filename)
-    return templates
+CARD_TEMPLATES: Dict[str, dict] = {
+    "template_1": {
+        "name": "经典风格",
+        "description": "原版设计",
+        "file": "template_1.html",
+        "path": _asset_path("template_1.html"),
+    },
+    "template_2": {
+        "name": "B站粉风格",
+        "description": "B站风格设计",
+        "file": "template_2.html",
+        "path": _asset_path("template_2.html"),
+    },
+    "simple": {
+        "name": "简约风格",
+        "description": "简洁现代的设计",
+        "file": "template_simple.html",
+        "path": _asset_path("template_simple.html"),
+    },
+}
+
+# 默认模板
+DEFAULT_TEMPLATE = "template_2"
 
 
-TEMPLATES = _discover_templates()
+def get_template_path(style: str) -> str:
+    """获取指定样式的模板路径"""
+    template = CARD_TEMPLATES.get(style, CARD_TEMPLATES[DEFAULT_TEMPLATE])
+    return template["path"]
+
+
+def get_template_names() -> list:
+    """获取所有模板的 ID 列表"""
+    return list(CARD_TEMPLATES.keys())
+
 
 MAX_ATTEMPTS = 3
 RETRY_DELAY = 2
