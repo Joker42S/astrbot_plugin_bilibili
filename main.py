@@ -5,7 +5,7 @@ from typing import List
 
 from astrbot.core.star.filter.command import GreedyStr
 from astrbot.api.all import *
-from astrbot.api import logger
+from astrbot.api import logger, AstrBotConfig
 from astrbot.api.message_components import Image, Plain
 from astrbot.api.event import MessageEventResult, AstrMessageEvent, MessageChain
 from astrbot.api.event.filter import (
@@ -22,13 +22,21 @@ from .renderer import Renderer
 from .bili_client import BiliClient
 from .listener import DynamicListener
 from .data_manager import DataManager
-from .constant import VALID_FILTER_TYPES, BV, LOGO_PATH
+from .constant import (
+    VALID_FILTER_TYPES,
+    BV,
+    LOGO_PATH,
+    BANNER_PATH,
+    CARD_TEMPLATES,
+    DEFAULT_TEMPLATE,
+    get_template_names,
+)
 from .tools.bangumi import BangumiTool
 
 
 @register("astrbot_plugin_bilibili", "Soulter", "", "", "")
 class Main(Star):
-    def __init__(self, context: Context, config: dict) -> None:
+    def __init__(self, context: Context, config: AstrBotConfig) -> None:
         super().__init__(context)
         self.cfg = config
         self.context = context
@@ -36,9 +44,11 @@ class Main(Star):
         self.rai = self.cfg.get("rai", True)
         self.enable_parse_miniapp = self.cfg.get("enable_parse_miniapp", True)
         self.enable_parse_BV = self.cfg.get("enable_parse_BV", True)
+        # 读取样式配置
+        self.style = self.cfg.get("renderer_template", DEFAULT_TEMPLATE)
 
         self.data_manager = DataManager()
-        self.renderer = Renderer(self, self.rai)
+        self.renderer = Renderer(self, self.rai, self.style)
         self.bili_client = BiliClient(self.cfg.get("sessdata"))
         self.dynamic_listener = DynamicListener(
             context=self.context,
@@ -49,6 +59,37 @@ class Main(Star):
         )
         self.context.add_llm_tools(BangumiTool())
         self.dynamic_listener_task = asyncio.create_task(self.dynamic_listener.start())
+
+    @command("卡片样式", alias={"bili_card_style"})
+    @permission_type(PermissionType.ADMIN)
+    async def switch_style(self, event: AstrMessageEvent, style: str = None):
+        """切换动态卡片样式。不带参数可以查看可用的卡片样式列表。"""
+        available = get_template_names()
+
+        # 不带参数：显示可用样式列表
+        if not style:
+            lines = ["📋 可用的卡片样式："]
+            for tid in available:
+                info = CARD_TEMPLATES[tid]
+                current = " ← 当前" if tid == self.style else ""
+                lines.append(f"  • {tid}: {info['name']}{current}")
+                lines.append(f"    {info['description']}")
+            lines.append(f"\n使用 /卡片样式 <样式名> 切换")
+            return MessageEventResult().message("\n".join(lines))
+
+        # 带参数：切换样式
+        if style not in available:
+            return MessageEventResult().message(
+                f"样式 '{style}' 不存在。可用样式：{', '.join(available)}"
+            )
+
+        self.style = style
+        self.renderer.style = style
+
+        info = CARD_TEMPLATES[style]
+        self.cfg["renderer_template"] = style
+        self.cfg.save_config()
+        return MessageEventResult().message(f"✅ 已切换样式为：{info['name']} ({style})")
 
     @regex(BV)
     async def get_video_info(self, event: AstrMessageEvent):
@@ -172,6 +213,7 @@ class Main(Star):
                 filter_desc += f"<br>过滤正则: {filter_regex}"
 
             render_data = await create_render_data()
+            render_data["uid"] = uid
             render_data["name"] = "AstrBot"
             render_data["avatar"] = await image_to_base64(LOGO_PATH)
             render_data["text"] = (
@@ -203,7 +245,8 @@ class Main(Star):
                 ]
                 return MessageEventResult(chain=chain, use_t2i_=False)
         except Exception as e:
-            return MessageEventResult().message(f"订阅完成，已保存配置，额外信息:{msg}")
+            logger.warning(f"订阅出现问题: {e}")
+            return MessageEventResult().message(f"订阅成功！但是:{e}")
 
     @command("订阅列表", alias={"bili_sub_list"})
     async def sub_list(self, event: AstrMessageEvent):

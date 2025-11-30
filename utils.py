@@ -1,11 +1,10 @@
 from astrbot.api.all import *
-import PIL
-import aiohttp
 import qrcode
 import io
 import base64
-import os
 from urllib.parse import urlparse
+from PIL import Image
+from astrbot.api import logger
 
 
 async def create_render_data() -> dict:
@@ -55,26 +54,9 @@ async def create_qrcode(url):
     )
     qr.add_data(url)
     qr.make(fit=True)
-    qr_image = qr.make_image(fill_color="#EC88EC", back_color="#F2F6FF")
+    qr_image = qr.make_image(fill_color="#fb7299", back_color="white")
     url = await image_to_base64(qr_image)
     return url
-
-
-async def get_and_crop_image(src, output_path, width=700):
-    if src.startswith(("http://", "https://")):
-        async with aiohttp.ClientSession() as session:
-            async with session.get(src, timeout=10) as response:
-                if response.status != 200:
-                    return
-                data = await response.read()
-                image = PIL.Image.open(io.BytesIO(data))
-    else:
-        if not os.path.exists(src):
-            return
-        image = PIL.Image.open(src)
-    w, h = image.size
-    cropped = image.crop((0, 0, min(width, w), h))
-    cropped.save(output_path)
 
 
 def is_valid_url(url: str) -> bool:
@@ -110,3 +92,20 @@ async def parse_rich_text(summary, topic):
             text = text.replace(topic_info, topic_tag)
 
     return text
+
+
+async def is_height_valid(img_path: str, max_height: int = 30000) -> bool:
+    """
+    检查图片高度是否在允许范围内
+    :param img_path: 图片文件路径
+    :param max_height: 最大允许高度
+    :return: 如果图片高度小于等于max_height则返回True，否则返回False
+    """
+
+    try:
+        with Image.open(img_path) as img:
+            _, height = img.size
+            return height <= max_height
+    except Exception as e:
+        logger.error(f"无法打开图片 {img_path} 进行高度检查: {e}")
+        return False
