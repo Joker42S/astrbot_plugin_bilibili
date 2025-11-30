@@ -47,6 +47,7 @@ plugin i https://github.com/Soulter/astrbot_plugin_bilibili
 | **全局列表** | (无) | **[管理员]** 查看所有会话的订阅情况。 | `bili_global_list` |
 | **全局订阅** | `<SID> <B站UID> [过滤器...]` | **[管理员]** 为指定 SID 会话添加对 UP 主的订阅。 | `bili_global_sub` |
 | **订阅测试** | `<B站UID>` | 测试订阅功能。仅测试获取动态与渲染图片功能，不保存订阅信息。 | `bili_sub_test` |
+| **卡片样式** | `[样式名]` | **[管理员]** 切换动态卡片渲染样式。不带参数查看可用样式列表。 | `bili_card_style` |
 
 #### 过滤器说明
 
@@ -103,6 +104,7 @@ UMO结构发生了变化，已为"全局列表"指令添加了具体订阅信息
 - 清理有关图片处理的代码，使用上游t2i支持的配置进行简化
 - 引入更加美观的新渲染模板，图片纵向排列以增强可读性；支持配置不同的模板
 - 现在可能以文件形式发送过长图片，具体参考常见问题#4
+- 新增模板，增强了模板管理即"卡片样式"指令，新增模板开发工具 by [ocetars](https://github.com/ocetars)，see [PR#53](https://github.com/Soulter/astrbot_plugin_bilibili/pull/53)
 
 ‼️astrbot_plugin_bilibili >= v1.4.14 需要 Astrbot >= 4.5.2；原因是使用了Astrbot >= 4.5.2推荐的函数调用写法，而Astrbot >= 4.5.3修复了webui工具显示错误，推荐升级到Astrbot >= 4.5.3
 
