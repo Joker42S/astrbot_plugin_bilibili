@@ -5,7 +5,7 @@ from typing import List
 
 from astrbot.core.star.filter.command import GreedyStr
 from astrbot.api.all import *
-from astrbot.api import logger
+from astrbot.api import logger, AstrBotConfig
 from astrbot.api.message_components import Image, Plain
 from astrbot.api.event import MessageEventResult, AstrMessageEvent, MessageChain
 from astrbot.api.event.filter import (
@@ -36,7 +36,7 @@ from .tools.bangumi import BangumiTool
 
 @register("astrbot_plugin_bilibili", "Soulter", "", "", "")
 class Main(Star):
-    def __init__(self, context: Context, config: dict) -> None:
+    def __init__(self, context: Context, config: AstrBotConfig) -> None:
         super().__init__(context)
         self.cfg = config
         self.context = context
@@ -87,6 +87,8 @@ class Main(Star):
         self.renderer.style = style
 
         info = CARD_TEMPLATES[style]
+        self.cfg["renderer_template"] = style
+        self.cfg.save_config()
         return MessageEventResult().message(f"✅ 已切换样式为：{info['name']} ({style})")
 
     @regex(BV)
