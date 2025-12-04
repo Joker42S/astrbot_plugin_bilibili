@@ -89,7 +89,9 @@ class Main(Star):
         info = CARD_TEMPLATES[style]
         self.cfg["renderer_template"] = style
         self.cfg.save_config()
-        return MessageEventResult().message(f"✅ 已切换样式为：{info['name']} ({style})")
+        return MessageEventResult().message(
+            f"✅ 已切换样式为：{info['name']} ({style})"
+        )
 
     @regex(BV)
     async def get_video_info(self, event: AstrMessageEvent):

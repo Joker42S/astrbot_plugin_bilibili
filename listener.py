@@ -1,4 +1,5 @@
 import re
+import time
 import asyncio
 import traceback
 from typing import Dict, Any
@@ -137,7 +138,9 @@ class DynamicListener:
                 if await is_height_valid(img_path):
                     ls = [Image.fromFileSystem(img_path)]
                 else:
-                    ls = [File(file=img_path, name="bilibili_dynamic.jpg")]
+                    timestamp = int(time.time())
+                    filename = f"bilibili_dynamic_{timestamp}.jpg"
+                    ls = [File(file=img_path, name=filename)]
                 ls.append(Plain(f"\n{url}"))
                 if self.node:
                     await self._send_dynamic(sub_user, ls, send_node=True)

@@ -97,9 +97,18 @@ SAMPLE_IMAGES = [
 ]
 
 SAMPLE_EMOJIS = [
-    ("https://i0.hdslb.com/bfs/emote/3087d273a78ccaff4bb1e9972e2ba2a7583c9f11.png", "[doge]"),
-    ("https://i0.hdslb.com/bfs/emote/bf03720868a26f230fc0dd4c5a8bda9d4b1a8c0b.png", "[笑哭]"),
-    ("https://i0.hdslb.com/bfs/emote/6ea59c827c414b4a2955fe79e0f6fd3dcd515e24.png", "[妙啊]"),
+    (
+        "https://i0.hdslb.com/bfs/emote/3087d273a78ccaff4bb1e9972e2ba2a7583c9f11.png",
+        "[doge]",
+    ),
+    (
+        "https://i0.hdslb.com/bfs/emote/bf03720868a26f230fc0dd4c5a8bda9d4b1a8c0b.png",
+        "[笑哭]",
+    ),
+    (
+        "https://i0.hdslb.com/bfs/emote/6ea59c827c414b4a2955fe79e0f6fd3dcd515e24.png",
+        "[妙啊]",
+    ),
 ]
 
 
@@ -136,9 +145,10 @@ MOCK_USERS = [
 
 # ==================== 动态类型模拟数据生成器 ====================
 
+
 class MockDataGenerator:
     """模拟数据生成器"""
-    
+
     @staticmethod
     def video_dynamic(
         user_index: int = 0,
@@ -152,15 +162,17 @@ class MockDataGenerator:
         """
         user = MOCK_USERS[user_index % len(MOCK_USERS)]
         data = create_base_render_data()
-        data.update({
-            "name": user["name"],
-            "avatar": user["avatar"],
-            "pendant": user["pendant"],
-            "type": "DYNAMIC_TYPE_AV",
-            "title": title,
-            "text": f"投稿了新视频<br>{content}",
-            "image_urls": [SAMPLE_COVERS[cover_index % len(SAMPLE_COVERS)]],
-        })
+        data.update(
+            {
+                "name": user["name"],
+                "avatar": user["avatar"],
+                "pendant": user["pendant"],
+                "type": "DYNAMIC_TYPE_AV",
+                "title": title,
+                "text": f"投稿了新视频<br>{content}",
+                "image_urls": [SAMPLE_COVERS[cover_index % len(SAMPLE_COVERS)]],
+            }
+        )
         if with_qrcode:
             url = "https://www.bilibili.com/video/BV1xx411c7mD"
             data["qrcode"] = create_qrcode_sync(url)
@@ -183,23 +195,28 @@ class MockDataGenerator:
         """
         user = MOCK_USERS[user_index % len(MOCK_USERS)]
         data = create_base_render_data()
-        
+
         text = content
         if with_topic:
-            text = "<a href='https://search.bilibili.com/all?keyword=日常'># 日常分享</a><br>" + text
+            text = (
+                "<a href='https://search.bilibili.com/all?keyword=日常'># 日常分享</a><br>"
+                + text
+            )
         if with_emoji:
             emoji_url, emoji_text = SAMPLE_EMOJIS[0]
             text = text + f" <img src='{emoji_url}'>"
-        
-        data.update({
-            "name": user["name"],
-            "avatar": user["avatar"],
-            "pendant": user["pendant"],
-            "type": "DYNAMIC_TYPE_DRAW",
-            "title": title,
-            "text": text,
-            "image_urls": SAMPLE_IMAGES[:min(image_count, 9)],
-        })
+
+        data.update(
+            {
+                "name": user["name"],
+                "avatar": user["avatar"],
+                "pendant": user["pendant"],
+                "type": "DYNAMIC_TYPE_DRAW",
+                "title": title,
+                "text": text,
+                "image_urls": SAMPLE_IMAGES[: min(image_count, 9)],
+            }
+        )
         if with_qrcode:
             url = "https://t.bilibili.com/123456789"
             data["qrcode"] = create_qrcode_sync(url)
@@ -219,23 +236,28 @@ class MockDataGenerator:
         """
         user = MOCK_USERS[user_index % len(MOCK_USERS)]
         data = create_base_render_data()
-        
+
         text = content
         if with_topic:
-            text = "<a href='https://search.bilibili.com/all?keyword=日常'># 每日打卡</a><br>" + text
+            text = (
+                "<a href='https://search.bilibili.com/all?keyword=日常'># 每日打卡</a><br>"
+                + text
+            )
         if with_emoji:
             emoji_url, emoji_text = SAMPLE_EMOJIS[1]
             text = text + f" <img src='{emoji_url}'>"
-        
-        data.update({
-            "name": user["name"],
-            "avatar": user["avatar"],
-            "pendant": user["pendant"],
-            "type": "DYNAMIC_TYPE_WORD",
-            "title": "",
-            "text": text,
-            "image_urls": [],
-        })
+
+        data.update(
+            {
+                "name": user["name"],
+                "avatar": user["avatar"],
+                "pendant": user["pendant"],
+                "type": "DYNAMIC_TYPE_WORD",
+                "title": "",
+                "text": text,
+                "image_urls": [],
+            }
+        )
         if with_qrcode:
             url = "https://t.bilibili.com/987654321"
             data["qrcode"] = create_qrcode_sync(url)
@@ -255,15 +277,17 @@ class MockDataGenerator:
         """
         user = MOCK_USERS[user_index % len(MOCK_USERS)]
         data = create_base_render_data()
-        data.update({
-            "name": user["name"],
-            "avatar": user["avatar"],
-            "pendant": user["pendant"],
-            "type": "DYNAMIC_TYPE_ARTICLE",
-            "title": title,
-            "text": content,
-            "image_urls": [SAMPLE_COVERS[cover_index % len(SAMPLE_COVERS)]],
-        })
+        data.update(
+            {
+                "name": user["name"],
+                "avatar": user["avatar"],
+                "pendant": user["pendant"],
+                "type": "DYNAMIC_TYPE_ARTICLE",
+                "title": title,
+                "text": content,
+                "image_urls": [SAMPLE_COVERS[cover_index % len(SAMPLE_COVERS)]],
+            }
+        )
         if with_qrcode:
             url = "https://www.bilibili.com/read/cv12345678"
             data["qrcode"] = create_qrcode_sync(url)
@@ -284,41 +308,49 @@ class MockDataGenerator:
         user = MOCK_USERS[user_index % len(MOCK_USERS)]
         forward_user = MOCK_USERS[forward_user_index % len(MOCK_USERS)]
         data = create_base_render_data()
-        
+
         # 构建被转发的内容
         forward_data = {
             "name": forward_user["name"],
             "avatar": forward_user["avatar"],
             "pendant": forward_user["pendant"],
         }
-        
+
         if forward_type == "video":
-            forward_data.update({
-                "title": "【必看】年度最佳视频合集",
-                "text": "这个视频太棒了，强烈推荐！",
-                "image_urls": [SAMPLE_COVERS[0]],
-            })
+            forward_data.update(
+                {
+                    "title": "【必看】年度最佳视频合集",
+                    "text": "这个视频太棒了，强烈推荐！",
+                    "image_urls": [SAMPLE_COVERS[0]],
+                }
+            )
         elif forward_type == "draw":
-            forward_data.update({
-                "title": "",
-                "text": "分享一些好看的图片~",
-                "image_urls": SAMPLE_IMAGES[:3],
-            })
+            forward_data.update(
+                {
+                    "title": "",
+                    "text": "分享一些好看的图片~",
+                    "image_urls": SAMPLE_IMAGES[:3],
+                }
+            )
         else:  # word
-            forward_data.update({
-                "title": "",
-                "text": "今天心情很好！",
-                "image_urls": [],
-            })
-        
-        data.update({
-            "name": user["name"],
-            "avatar": user["avatar"],
-            "pendant": user["pendant"],
-            "type": "DYNAMIC_TYPE_FORWARD",
-            "text": comment,
-            "forward": forward_data,
-        })
+            forward_data.update(
+                {
+                    "title": "",
+                    "text": "今天心情很好！",
+                    "image_urls": [],
+                }
+            )
+
+        data.update(
+            {
+                "name": user["name"],
+                "avatar": user["avatar"],
+                "pendant": user["pendant"],
+                "type": "DYNAMIC_TYPE_FORWARD",
+                "text": comment,
+                "forward": forward_data,
+            }
+        )
         if with_qrcode:
             url = "https://t.bilibili.com/forward123456"
             data["qrcode"] = create_qrcode_sync(url)
@@ -328,23 +360,23 @@ class MockDataGenerator:
 
 # ==================== 预设场景 ====================
 
+
 def get_all_mock_scenarios() -> Dict[str, Dict[str, Any]]:
     """
     获取所有预设的模拟场景
     返回: {场景名称: 渲染数据}
     """
     gen = MockDataGenerator()
-    
+
     scenarios = {
         # ===== 视频动态 =====
         "视频动态_标准": gen.video_dynamic(),
         "视频动态_长标题": gen.video_dynamic(
             title="【4K120帧】这是一个超级超级超级长的视频标题用于测试UI在极端情况下的显示效果会不会出现溢出或者截断的问题",
-            content="视频简介也可以很长，这里测试一下长文本的显示效果，看看会不会有什么问题。"
+            content="视频简介也可以很长，这里测试一下长文本的显示效果，看看会不会有什么问题。",
         ),
         "视频动态_无二维码": gen.video_dynamic(with_qrcode=False),
         "视频动态_长用户名": gen.video_dynamic(user_index=4),
-        
         # ===== 图文动态 =====
         "图文动态_1图": gen.draw_dynamic(image_count=1),
         "图文动态_2图": gen.draw_dynamic(image_count=2),
@@ -360,35 +392,31 @@ def get_all_mock_scenarios() -> Dict[str, Dict[str, Any]]:
         "图文动态_带标题": gen.draw_dynamic(title="今日份的快乐分享", image_count=4),
         "图文动态_长文本": gen.draw_dynamic(
             content="这是一段非常长的动态内容，用于测试文本在卡片中的显示效果。" * 10,
-            image_count=3
+            image_count=3,
         ),
-        
         # ===== 纯文字动态 =====
         "文字动态_标准": gen.word_dynamic(),
         "文字动态_带话题": gen.word_dynamic(with_topic=True),
         "文字动态_无表情": gen.word_dynamic(with_emoji=False),
         "文字动态_长文本": gen.word_dynamic(
-            content="这是一段超长的纯文字动态内容，用于测试在没有图片的情况下，卡片如何显示大量文本。" * 15
+            content="这是一段超长的纯文字动态内容，用于测试在没有图片的情况下，卡片如何显示大量文本。"
+            * 15
         ),
         "文字动态_多行文本": gen.word_dynamic(
             content="第一行内容<br>第二行内容<br>第三行内容<br>第四行内容<br>第五行内容"
         ),
-        
         # ===== 专栏文章 =====
         "专栏文章_标准": gen.article_dynamic(),
         "专栏文章_长标题": gen.article_dynamic(
             title="【深度长文】从零开始的异世界生活第二季深度解析：剧情、人物、世界观全方位分析"
         ),
-        
         # ===== 转发动态 =====
         "转发动态_转发视频": gen.forward_dynamic(forward_type="video"),
         "转发动态_转发图文": gen.forward_dynamic(forward_type="draw"),
         "转发动态_转发文字": gen.forward_dynamic(forward_type="word"),
         "转发动态_长评论": gen.forward_dynamic(
-            comment="这个视频/动态太棒了！强烈推荐给大家！" * 5,
-            forward_type="video"
+            comment="这个视频/动态太棒了！强烈推荐给大家！" * 5, forward_type="video"
         ),
-        
         # ===== 边界情况 =====
         "边界_空内容": {
             **create_base_render_data(),
@@ -407,7 +435,7 @@ def get_all_mock_scenarios() -> Dict[str, Dict[str, Any]]:
             content="测试特殊字符: <script>alert('xss')</script> &lt;div&gt; &amp; © ® ™ 😀 🎉 🔥"
         ),
     }
-    
+
     return scenarios
 
 
@@ -424,6 +452,7 @@ def get_scenario_by_name(name: str) -> Optional[Dict[str, Any]]:
 
 # ==================== 分类获取 ====================
 
+
 def get_scenarios_by_category() -> Dict[str, List[str]]:
     """按类别获取场景名称"""
     all_names = get_scenario_names()
@@ -435,13 +464,13 @@ def get_scenarios_by_category() -> Dict[str, List[str]]:
         "转发动态": [],
         "边界情况": [],
     }
-    
+
     for name in all_names:
         for cat in categories:
             if name.startswith(cat.replace("情况", "")):
                 categories[cat].append(name)
                 break
-    
+
     return categories
 
 
@@ -452,4 +481,3 @@ if __name__ == "__main__":
         print(f"\n{cat}:")
         for name in names:
             print(f"  - {name}")
-

@@ -80,7 +80,7 @@ class Renderer:
                 if (
                     render_output
                     and os.path.exists(render_output)
-                    and os.path.getsize(render_output) > 0
+                    and os.path.getsize(render_output) > 4096
                 ):
                     return render_output  # 成功，直接返回渲染结果
             except Exception as e:

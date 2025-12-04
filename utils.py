@@ -94,7 +94,7 @@ async def parse_rich_text(summary, topic):
     return text
 
 
-async def is_height_valid(img_path: str, max_height: int = 30000) -> bool:
+async def is_height_valid(img_path: str, max_height: int = 25000) -> bool:
     """
     检查图片高度是否在允许范围内
     :param img_path: 图片文件路径

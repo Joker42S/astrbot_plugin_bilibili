@@ -32,12 +32,15 @@ def get_template_options() -> list:
     """获取模板选项列表，用于前端下拉框"""
     options = []
     for tid, info in CARD_TEMPLATES.items():
-        options.append({
-            "id": tid,
-            "name": info["name"],
-            "description": info["description"],
-        })
+        options.append(
+            {
+                "id": tid,
+                "name": info["name"],
+                "description": info["description"],
+            }
+        )
     return options
+
 
 # 开发服务器端口
 DEV_PORT = 8765
@@ -451,12 +454,12 @@ CONTROL_PANEL_HTML = """
 
 class DevServerHandler(SimpleHTTPRequestHandler):
     """开发服务器请求处理器"""
-    
+
     def do_GET(self):
         parsed = urlparse(self.path)
         path = parsed.path
         query = parse_qs(parsed.query)
-        
+
         if path == "/" or path == "/index.html":
             self.serve_control_panel()
         elif path == "/render":
@@ -468,56 +471,61 @@ class DevServerHandler(SimpleHTTPRequestHandler):
             self.serve_scenario_data(scenario_name)
         else:
             super().do_GET()
-    
+
     def serve_control_panel(self):
         """提供控制面板页面"""
         categories = get_scenarios_by_category()
         template_options = get_template_options()
-        
+
         html = CONTROL_PANEL_HTML.replace(
-            "SCENARIOS_DATA",
-            json.dumps(categories, ensure_ascii=False)
-        ).replace(
-            "TEMPLATE_OPTIONS",
-            json.dumps(template_options, ensure_ascii=False)
-        )
-        
+            "SCENARIOS_DATA", json.dumps(categories, ensure_ascii=False)
+        ).replace("TEMPLATE_OPTIONS", json.dumps(template_options, ensure_ascii=False))
+
         self.send_response(200)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.end_headers()
         self.wfile.write(html.encode("utf-8"))
-    
+
     def serve_rendered_template(self, scenario_name: str, style: str):
         """提供渲染后的模板"""
         data = get_scenario_by_name(scenario_name)
         if not data:
             self.send_error(404, f"Scenario not found: {scenario_name}")
             return
-        
+
         template_content = get_template(style)
         template = Template(template_content)
         rendered = template.render(**data)
-        
+
         self.send_response(200)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.end_headers()
         self.wfile.write(rendered.encode("utf-8"))
-    
+
     def serve_scenario_data(self, scenario_name: str):
         """提供场景的原始数据"""
         data = get_scenario_by_name(scenario_name)
         if not data:
             self.send_error(404, f"Scenario not found: {scenario_name}")
             return
-        
+
         # 移除 base64 数据以便查看
-        display_data = {k: (v[:100] + "..." if isinstance(v, str) and len(v) > 100 and v.startswith("data:") else v) for k, v in data.items()}
-        
+        display_data = {
+            k: (
+                v[:100] + "..."
+                if isinstance(v, str) and len(v) > 100 and v.startswith("data:")
+                else v
+            )
+            for k, v in data.items()
+        }
+
         self.send_response(200)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.end_headers()
-        self.wfile.write(json.dumps(display_data, ensure_ascii=False, indent=2).encode("utf-8"))
-    
+        self.wfile.write(
+            json.dumps(display_data, ensure_ascii=False, indent=2).encode("utf-8")
+        )
+
     def log_message(self, format, *args):
         """自定义日志格式"""
         print(f"[DevServer] {args[0]}")
@@ -526,10 +534,10 @@ class DevServerHandler(SimpleHTTPRequestHandler):
 def run_dev_server(port: int = DEV_PORT, open_browser: bool = True):
     """启动开发服务器"""
     os.chdir(PROJECT_ROOT)
-    
+
     server = HTTPServer(("localhost", port), DevServerHandler)
     url = f"http://localhost:{port}"
-    
+
     print(f"""
 ╔══════════════════════════════════════════════════════════════╗
 ║          🎬 Bilibili Plugin UI Dev Server                    ║
@@ -546,10 +554,10 @@ def run_dev_server(port: int = DEV_PORT, open_browser: bool = True):
 ║                                                              ║
 ╚══════════════════════════════════════════════════════════════╝
     """)
-    
+
     if open_browser:
         webbrowser.open(url)
-    
+
     try:
         server.serve_forever()
     except KeyboardInterrupt:
@@ -559,9 +567,10 @@ def run_dev_server(port: int = DEV_PORT, open_browser: bool = True):
 
 if __name__ == "__main__":
     import argparse
+
     parser = argparse.ArgumentParser(description="Bilibili Plugin UI Dev Server")
     parser.add_argument("--port", "-p", type=int, default=DEV_PORT, help="服务器端口")
     parser.add_argument("--no-browser", action="store_true", help="不自动打开浏览器")
     args = parser.parse_args()
-    
+
     run_dev_server(port=args.port, open_browser=not args.no_browser)
