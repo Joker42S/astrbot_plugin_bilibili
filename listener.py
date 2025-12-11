@@ -10,7 +10,7 @@ from astrbot.api.all import *
 from .data_manager import DataManager
 from .bili_client import BiliClient
 from .renderer import Renderer
-from .utils import create_render_data, image_to_base64, create_qrcode, is_height_valid
+from .utils import create_render_data, image_to_base64, create_qrcode, is_height_valid, download_image
 from .constant import LOGO_PATH, BANNER_PATH
 
 
@@ -39,6 +39,7 @@ class DynamicListener:
     async def start(self):
         """启动后台监听循环。"""
         while True:
+            await asyncio.sleep(60 * self.interval_mins)
             if self.bili_client.credential is None:
                 logger.warning("bilibili sessdata 未设置，无法获取动态")
                 await asyncio.sleep(60 * self.interval_mins)
@@ -53,7 +54,6 @@ class DynamicListener:
                         logger.error(
                             f"处理订阅者 {sub_user} 的 UP主 {sub_data.get('uid', '未知UID')} 时发生未知错误: {e}\n{traceback.format_exc()}"
                         )
-            await asyncio.sleep(60 * self.interval_mins)
 
     async def _check_single_up(self, sub_user: str, sub_data: Dict[str, Any]):
         """检查单个订阅的UP主是否有更新。"""
@@ -88,7 +88,7 @@ class DynamicListener:
         if lives:
             await self._handle_live_status(sub_user, sub_data, lives)
 
-    def _compose_plain_dynamic(
+    async def _compose_plain_dynamic(
         self, render_data: Dict[str, Any], render_fail: bool = False
     ):
         """转换为纯文本消息链。"""
@@ -101,25 +101,32 @@ class DynamicListener:
             Plain(summary),
         ]
         for pic in render_data.get("image_urls", []):
-            ls.append(Image.fromURL(pic))
+            local_file = await download_image(pic)
+            if local_file:
+                ls.append(Image.fromFileSystem(local_file))
+            else:
+                ls.append(Plain(f"图片下载失败\n"))
         return ls
 
     async def _send_dynamic(
         self, sub_user: str, chain_parts: list, send_node: bool = False
     ):
-        if self.node or send_node:
-            qqNode = Node(
-                uin=0,
-                name="AstrBot",
-                content=chain_parts,
-            )
-            await self.context.send_message(
-                sub_user, MessageEventResult(chain=[qqNode])
-            )
-        else:
-            await self.context.send_message(
-                sub_user, MessageEventResult(chain=chain_parts).use_t2i(False)
-            )
+        try:
+            if self.node or send_node:
+                qqNode = Node(
+                    uin=0,
+                    name="AstrBot",
+                    content=chain_parts,
+                )
+                await self.context.send_message(
+                    sub_user, MessageEventResult(chain=[qqNode])
+                )
+            else:
+                await self.context.send_message(
+                    sub_user, MessageEventResult(chain=chain_parts).use_t2i(False)
+                )
+        except Exception as e:
+            logger.error(f"发送动态消息时发生错误: {e}，内容：{chain_parts}")
 
     async def _handle_new_dynamic(self, sub_user: str, render_data: Dict[str, Any]):
         """处理并发送新的动态通知。"""
@@ -128,7 +135,7 @@ class DynamicListener:
             "DYNAMIC_TYPE_DRAW",
             "DYNAMIC_TYPE_WORD",
         ):
-            ls = self._compose_plain_dynamic(render_data)
+            ls = await self._compose_plain_dynamic(render_data)
             await self._send_dynamic(sub_user, ls)
         # 默认渲染成图片
         else:
@@ -150,7 +157,7 @@ class DynamicListener:
                     )
             else:
                 logger.error("渲染图片失败，尝试发送纯文本消息")
-                ls = self._compose_plain_dynamic(render_data, render_fail=True)
+                ls = await self._compose_plain_dynamic(render_data, render_fail=True)
                 await self._send_dynamic(sub_user, ls, send_node=True)
 
     async def _handle_live_status(self, sub_user: str, sub_data: Dict, live_room: Dict):
