@@ -64,7 +64,13 @@ class Renderer:
         这是该类的主要入口方法。
         """
         # options = {"full_page": True, "type": "png", "quality": None, "scale": "device"}
-        options = {"full_page": True, "type": "jpeg", "quality": 95, "scale": "device"}
+        options = {
+            "full_page": True,
+            "type": "jpeg",
+            "quality": 95,
+            "scale": "device",
+            "device_scale_factor_level": "ultra",
+        }
 
         tmpl = self.get_template(style)
 
