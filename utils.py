@@ -1,6 +1,7 @@
 from astrbot.api.all import *
 import qrcode
 import io
+import re
 import base64
 from urllib.parse import urlparse
 from PIL import Image as PILImage
@@ -65,6 +66,11 @@ def is_valid_url(url: str) -> bool:
         return all([parsed.scheme, parsed.netloc])
     except ValueError:
         return False
+
+
+def is_valid_umo(umo: str) -> bool:
+    pattern = r"([^:]+):\s*([^:]+):\s*(.+)"
+    return re.match(pattern, umo) is not None
 
 
 async def parse_rich_text(summary, topic):

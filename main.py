@@ -286,25 +286,25 @@ class Main(Star):
 
     @permission_type(PermissionType.ADMIN)
     @command("全局删除", alias={"bili_global_del"})
-    async def global_sub_del(self, event: AstrMessageEvent, sid: str = None):
-        """管理员指令。通过 SID 删除某一个群聊或者私聊的所有订阅。使用 /sid 查看当前会话的 SID。"""
-        if not sid:
+    async def global_sub_del(self, event: AstrMessageEvent, umo: str = None):
+        """管理员指令。通过 UMO 删除某一个群聊或者私聊的所有订阅。"""
+        if not is_valid_umo(umo):
             return MessageEventResult().message(
-                "通过 SID 删除某一个群聊或者私聊的所有订阅。使用 /sid 指令查看当前会话的 SID。"
+                "通过 UMO 删除某一个群聊或者私聊的所有订阅。使用 /sid 指令查看当前会话的 UMO 或参考 WebUI-自定义规则。"
             )
 
-        msg = await self.data_manager.remove_all_for_user(sid)
+        msg = await self.data_manager.remove_all_for_user(umo)
         return MessageEventResult().message(msg)
 
     @permission_type(PermissionType.ADMIN)
     @command("全局订阅", alias={"bili_global_sub"})
     async def global_sub_add(
-        self, event: AstrMessageEvent, sid: str, uid: str, input: GreedyStr
+        self, event: AstrMessageEvent, umo: str, uid: str, input: GreedyStr
     ):
         """管理员指令。通过 UID 添加某一个用户的所有订阅。"""
-        if not sid or not uid.isdigit():
+        if not is_valid_umo(umo) or not uid.isdigit():
             return MessageEventResult().message(
-                "请提供正确的SID与UID。使用 /sid 指令查看当前会话的 SID"
+                "请提供正确的UMO与UID。使用 /sid 指令查看当前会话的 UMO 或参考 WebUI-自定义规则。"
             )
         args = input.strip().split(" ") if input.strip() else []
         filter_types: List[str] = []
@@ -316,7 +316,7 @@ class Main(Star):
                 filter_regex.append(arg)
 
         if await self.data_manager.update_subscription(
-            sid, int(uid), filter_types, filter_regex
+            umo, int(uid), filter_types, filter_regex
         ):
             return MessageEventResult().message("该动态已订阅，已更新过滤条件")
 
@@ -342,12 +342,12 @@ class Main(Star):
             logger.error(f"获取 {usr_info['name']} 初始动态失败: {e}")
         finally:
             # 保存配置
-            await self.data_manager.add_subscription(sid, _sub_data)
+            await self.data_manager.add_subscription(umo, _sub_data)
             if not usr_info:
                 return MessageEventResult().message(msg)
             else:
                 return MessageEventResult().message(
-                    f"订阅完成，已为{sid}添加订阅{uid}，详情见日志。"
+                    f"订阅完成，已为{umo}添加订阅{uid}，详情见日志。"
                 )
 
     @permission_type(PermissionType.ADMIN)
