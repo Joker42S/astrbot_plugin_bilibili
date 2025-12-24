@@ -60,7 +60,7 @@ class Main(Star):
         self.context.add_llm_tools(BangumiTool())
         self.dynamic_listener_task = asyncio.create_task(self.dynamic_listener.start())
 
-    @command("卡片样式", alias={"bili_card_style"})
+    @command("bili_card_style", alias={"卡片样式"})
     @permission_type(PermissionType.ADMIN)
     async def switch_style(self, event: AstrMessageEvent, style: str = None):
         """切换动态卡片样式。不带参数可以查看可用的卡片样式列表。"""
@@ -150,7 +150,7 @@ class Main(Star):
                     MessageChain().message(msg).message(text).url_image(info["pic"])
                 )
 
-    @command("订阅动态", alias={"bili_sub"})
+    @command("bili_sub", alias={"订阅动态"})
     async def dynamic_sub(self, event: AstrMessageEvent, uid: str, input: GreedyStr):
         args = input.strip().split(" ") if input.strip() else []
 
@@ -250,7 +250,7 @@ class Main(Star):
             logger.warning(f"订阅出现问题: {e}")
             return MessageEventResult().message(f"订阅成功！但是:{e}")
 
-    @command("订阅列表", alias={"bili_sub_list"})
+    @command("bili_sub_list", alias={"订阅列表"})
     async def sub_list(self, event: AstrMessageEvent):
         """查看 bilibili 动态监控列表"""
         sub_user = event.unified_msg_origin
@@ -270,7 +270,7 @@ class Main(Star):
                     ret += f"{idx + 1}. {uid} - {name}\n"
             return MessageEventResult().message(ret)
 
-    @command("订阅删除", alias={"bili_sub_del"})
+    @command("bili_sub_del", alias={"订阅删除"})
     async def sub_del(self, event: AstrMessageEvent, uid: str):
         """删除 bilibili 动态监控"""
         sub_user = event.unified_msg_origin
@@ -285,7 +285,7 @@ class Main(Star):
             return MessageEventResult().message("未找到指定的订阅")
 
     @permission_type(PermissionType.ADMIN)
-    @command("全局删除", alias={"bili_global_del"})
+    @command("bili_global_del", alias={"全局删除"})
     async def global_sub_del(self, event: AstrMessageEvent, umo: str = None):
         """管理员指令。通过 UMO 删除某一个群聊或者私聊的所有订阅。"""
         if not is_valid_umo(umo):
@@ -297,7 +297,7 @@ class Main(Star):
         return MessageEventResult().message(msg)
 
     @permission_type(PermissionType.ADMIN)
-    @command("全局订阅", alias={"bili_global_sub"})
+    @command("bili_global_sub", alias={"全局订阅"})
     async def global_sub_add(
         self, event: AstrMessageEvent, umo: str, uid: str, input: GreedyStr
     ):
@@ -351,7 +351,7 @@ class Main(Star):
                 )
 
     @permission_type(PermissionType.ADMIN)
-    @command("全局列表", alias={"bili_global_list"})
+    @command("bili_global_list", alias={"全局列表"})
     async def global_list(self, event: AstrMessageEvent):
         """管理员指令。查看所有订阅者"""
         ret = "订阅会话列表：\n"
@@ -404,7 +404,7 @@ class Main(Star):
                     except Exception as e:
                         logger.error(f"An error occurred during JSON processing: {e}")
 
-    @command("订阅测试", alias={"bili_sub_test"})
+    @command("bili_sub_test", alias={"订阅测试"})
     async def sub_test(self, event: AstrMessageEvent, uid: str):
         """测试订阅功能。仅测试获取动态与渲染图片功能，不保存订阅信息。"""
         sub_user = event.unified_msg_origin
