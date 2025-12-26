@@ -2,6 +2,7 @@ import re
 import time
 import asyncio
 import traceback
+from collections import OrderedDict
 from typing import Dict, Any
 from astrbot.api import logger
 from astrbot.api.message_components import Image, Plain, Node, File
@@ -35,6 +36,8 @@ class DynamicListener:
         self.rai = cfg.get("rai", True)
         self.node = cfg.get("node", False)
         self.dynamic_limit = cfg.get("dynamic_limit", 5)
+        self.render_cache: OrderedDict[str, Dict[str, Any]] = OrderedDict()
+        self.render_cache_limit = int(cfg.get("render_cache_limit", 32))
 
     async def start(self):
         """启动后台监听循环。"""
@@ -70,7 +73,7 @@ class DynamicListener:
                 if render_data:
                     if sent < self.dynamic_limit:
                         sent += 1
-                        await self._handle_new_dynamic(sub_user, render_data)
+                        await self._handle_new_dynamic(sub_user, render_data, dyn_id)
                     await self.data_manager.update_last_dynamic_id(
                         sub_user, uid, dyn_id
                     )
@@ -121,37 +124,52 @@ class DynamicListener:
                 sub_user, MessageEventResult(chain=chain_parts).use_t2i(False)
             )
 
-    async def _handle_new_dynamic(self, sub_user: str, render_data: Dict[str, Any]):
+    def _cache_render(self, dyn_id: str, chain_parts: list, send_node: bool):
+        """缓存渲染结果，避免同一动态在不同会话重复渲染。"""
+        if not dyn_id:
+            return
+        self.render_cache[dyn_id] = {"chain": chain_parts, "send_node": send_node}
+        while len(self.render_cache) > self.render_cache_limit:
+            self.render_cache.popitem(last=False)
+
+    async def _handle_new_dynamic(
+        self, sub_user: str, render_data: Dict[str, Any], dyn_id: str = None
+    ):
         """处理并发送新的动态通知。"""
+        cached = self.render_cache.get(dyn_id) if dyn_id else None
+        if cached:
+            await self._send_dynamic(sub_user, cached["chain"], cached["send_node"])
+            return
+
+        send_node_flag = self.node
         # 非图文混合模式
         if not self.rai and render_data.get("type") in (
             "DYNAMIC_TYPE_DRAW",
             "DYNAMIC_TYPE_WORD",
         ):
             ls = self._compose_plain_dynamic(render_data)
-            await self._send_dynamic(sub_user, ls)
-        # 默认渲染成图片
-        else:
-            img_path = await self.renderer.render_dynamic(render_data)
-            if img_path:
-                url = render_data.get("url", "")
-                if await is_height_valid(img_path):
-                    ls = [Image.fromFileSystem(img_path)]
-                else:
-                    timestamp = int(time.time())
-                    filename = f"bilibili_dynamic_{timestamp}.jpg"
-                    ls = [File(file=img_path, name=filename)]
-                ls.append(Plain(f"\n{url}"))
-                if self.node:
-                    await self._send_dynamic(sub_user, ls, send_node=True)
-                else:
-                    await self.context.send_message(
-                        sub_user, MessageEventResult(chain=ls).use_t2i(False)
-                    )
+            await self._send_dynamic(sub_user, ls, send_node_flag)
+            self._cache_render(dyn_id, ls, send_node_flag)
+            return
+
+        img_path = await self.renderer.render_dynamic(render_data)
+        if img_path:
+            url = render_data.get("url", "")
+            if await is_height_valid(img_path):
+                ls = [Image.fromFileSystem(img_path)]
             else:
-                logger.error("渲染图片失败，尝试发送纯文本消息")
-                ls = self._compose_plain_dynamic(render_data, render_fail=True)
-                await self._send_dynamic(sub_user, ls, send_node=True)
+                timestamp = int(time.time())
+                filename = f"bilibili_dynamic_{timestamp}.jpg"
+                ls = [File(file=img_path, name=filename)]
+            ls.append(Plain(f"\n{url}"))
+            await self._send_dynamic(sub_user, ls, send_node_flag)
+            self._cache_render(dyn_id, ls, send_node_flag)
+            return
+
+        logger.error("渲染图片失败，尝试发送纯文本消息")
+        ls = self._compose_plain_dynamic(render_data, render_fail=True)
+        await self._send_dynamic(sub_user, ls, send_node=True)
+        self._cache_render(dyn_id, ls, send_node=True)
 
     async def _handle_live_status(self, sub_user: str, sub_data: Dict, live_room: Dict):
         """处理并发送直播状态变更通知。"""
