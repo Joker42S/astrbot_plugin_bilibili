@@ -78,8 +78,12 @@ class DataManager:
         all_subs = self.get_all_subscriptions()
         if sub_user not in all_subs:
             all_subs[sub_user] = []
-
-        all_subs[sub_user].append(sub_data)
+        uid = sub_data.get("uid")
+        existing = self.get_subscription(sub_user, uid) if uid is not None else None
+        if existing:
+            existing.update(sub_data)
+        else:
+            all_subs[sub_user].append(sub_data)
         await self.save()
 
     async def update_subscription(

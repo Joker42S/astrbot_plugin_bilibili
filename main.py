@@ -185,12 +185,16 @@ class Main(Star):
             }
             # 获取最新一条动态 (用于初始化 last_id)
             dyn = await self.bili_client.get_latest_dynamics(int(uid))
-            _, dyn_id = (
-                await self.dynamic_listener._parse_and_filter_dynamics(dyn, _sub_data)
-            )[0]
-            _sub_data["last"] = dyn_id  # 更新 last id
-            _sub_data["recent_ids"] = [dyn_id]
-
+            if dyn:
+                await self.data_manager.add_subscription(sub_user, _sub_data)
+                result_list = await self.dynamic_listener._parse_and_filter_dynamics(
+                    dyn, _sub_data
+                )
+                for render_data, dyn_id in reversed(result_list):
+                    if dyn_id:
+                        await self.data_manager.update_last_dynamic_id(
+                            sub_user, int(uid), dyn_id
+                        )
         except Exception as e:
             logger.error(f"获取初始动态失败: {e}")
         finally:
@@ -331,11 +335,16 @@ class Main(Star):
             }
 
             dyn = await self.bili_client.get_latest_dynamics(int(uid))
-            _, dyn_id = (
-                await self.dynamic_listener._parse_and_filter_dynamics(dyn, _sub_data)
-            )[0]
-            _sub_data["last"] = dyn_id
-            _sub_data["recent_ids"] = [dyn_id]
+            if dyn:
+                await self.data_manager.add_subscription(umo, _sub_data)
+                result_list = await self.dynamic_listener._parse_and_filter_dynamics(
+                    dyn, _sub_data
+                )
+                for _, dyn_id in reversed(result_list):
+                    if dyn_id:
+                        await self.data_manager.update_last_dynamic_id(
+                            umo, int(uid), dyn_id
+                        )
 
             usr_info, msg = await self.bili_client.get_user_info(int(uid))
         except Exception as e:
