@@ -387,7 +387,10 @@ class Main(Star):
                     json_string = msg_element.data
 
                     try:
-                        parsed_data = json.loads(json_string)
+                        if isinstance(json_string, dict):
+                            parsed_data = json_string
+                        else:
+                            parsed_data = json.loads(json_string)
                         meta = parsed_data.get("meta", {})
                         detail_1 = meta.get("detail_1", {})
                         title = detail_1.get("title")
