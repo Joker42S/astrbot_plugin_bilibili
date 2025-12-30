@@ -169,7 +169,6 @@ class DynamicListener:
         logger.error("渲染图片失败，尝试发送纯文本消息")
         ls = self._compose_plain_dynamic(render_data, render_fail=True)
         await self._send_dynamic(sub_user, ls, send_node=True)
-        self._cache_render(dyn_id, ls, send_node=True)
 
     async def _handle_live_status(self, sub_user: str, sub_data: Dict, live_room: Dict):
         """处理并发送直播状态变更通知。"""
