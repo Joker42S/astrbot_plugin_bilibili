@@ -40,14 +40,14 @@ plugin i https://github.com/Soulter/astrbot_plugin_bilibili
 
 | 指令 | 参数 | 说明 | 别名 |
 | :--- | :--- | :--- | :--- |
-| **订阅动态** | `<B站UID> [过滤器...]` | 订阅指定 UP 主的动态。可以添加多个过滤器（以空格分隔）以排除不感兴趣的内容。 | `bili_sub` |
-| **订阅列表** | (无) | 显示当前会话的所有订阅。 | `bili_sub_list` |
-| **订阅删除** | `<B站UID>` | 删除当前会话中对指定 UP 主的订阅。 | `bili_sub_del` |
-| **全局删除** | `<SID>` | **[管理员]** 删除指定 SID 会话的所有订阅。使用 `/sid` 指令可查看会话 SID。 | `bili_global_del` |
-| **全局列表** | (无) | **[管理员]** 查看所有会话的订阅情况。 | `bili_global_list` |
-| **全局订阅** | `<SID> <B站UID> [过滤器...]` | **[管理员]** 为指定 SID 会话添加对 UP 主的订阅。 | `bili_global_sub` |
-| **订阅测试** | `<B站UID>` | 测试订阅功能。仅测试获取动态与渲染图片功能，不保存订阅信息。 | `bili_sub_test` |
-| **卡片样式** | `[样式名]` | **[管理员]** 切换动态卡片渲染样式。不带参数查看可用样式列表。 | `bili_card_style` |
+| **bili_sub** | `<B站UID> [过滤器...]` | 订阅指定 UP 主的动态。可以添加多个过滤器（以空格分隔）以排除不感兴趣的内容。 | `订阅动态` |
+| **bili_sub_list** | (无) | 显示当前会话的所有订阅。 | `订阅列表` |
+| **bili_sub_del** | `<B站UID>` | 删除当前会话中对指定 UP 主的订阅。 | `订阅删除` |
+| **bili_global_del** | `<SID>` | **[管理员]** 删除指定会话的所有订阅。使用 `/sid` 指令可查看会话 UMO。 | `全局删除` |
+| **bili_global_list** | (无) | **[管理员]** 查看所有会话的订阅情况。 | `全局列表` |
+| **bili_global_sub** | `<SID> <B站UID> [过滤器...]` | **[管理员]** 为指定会话（UMO）添加对 UP 主的订阅。 | `全局订阅` |
+| **bili_sub_test** | `<B站UID>` | 测试订阅功能。仅测试获取动态与渲染图片功能，不保存订阅信息。 | `订阅测试` |
+| **bili_card_style** | `[样式名]` | **[管理员]** 切换动态卡片渲染样式。不带参数查看可用样式列表。 | `卡片样式` |
 
 #### 过滤器说明
 
@@ -73,11 +73,6 @@ plugin i https://github.com/Soulter/astrbot_plugin_bilibili
   - aiocqhttp
   - nakuru
 
-## Contributors
-
-1. [@Flartiny](https://github.com/Flartiny)
-2. [@Soulter](https://github.com/Soulter)
-
 ## 常见问题
 
 1. 渲染图片失败 (尝试次数: 1): 500, message='Internal Server Error'  
@@ -98,19 +93,28 @@ UMO结构发生了变化，已为"全局列表"指令添加了具体订阅信息
 始终推荐[自部署](https://docs.astrbot.app/others/self-host-t2i.html)，并且由于t2i服务更新，推荐及时更新到最新的镜像。  
 本插件会始终在合适时支持更新的版本。
 
+## 模板开发
+
+详见[PR#53](https://github.com/Soulter/astrbot_plugin_bilibili/pull/53)
+```bash
+# 启动UI开发模式
+cd astrbot_plugin_bilibili
+python dev_ui.py
+```
+
+## Contributors
+
+<a href="https://github.com/soulter/astrbot_plugin_bilibili/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=soulter/astrbot_plugin_bilibili" />
+</a>
+
 ## 更新日志
 
-### v1.4.18
-- 修复包名冲突
-
-### v1.4.17
-- 优化渲染错误边界判定与相应提示，避免空图片
-
-### v1.4.16
-- 清理有关图片处理的代码，使用上游t2i支持的配置进行简化
-- 引入更加美观的新渲染模板，图片纵向排列以增强可读性；支持配置不同的模板
-- 现在可能以文件形式发送过长图片，具体参考常见问题#4
-- 新增模板，增强了模板管理即"卡片样式"指令，新增模板开发工具 by [ocetars](https://github.com/ocetars)，see [PR#53](https://github.com/Soulter/astrbot_plugin_bilibili/pull/53)
+### v1.4.19
+- 交换指令名与指令别名，更好地用于更多平台适配器，对用户无实际影响
+- 相同动态对应图片不再重复渲染
+- 修复小程序解析错误
+- 图片质量提升等小改动
 
 ‼️astrbot_plugin_bilibili >= v1.4.14 需要 Astrbot >= 4.5.2；原因是使用了Astrbot >= 4.5.2推荐的函数调用写法，而Astrbot >= 4.5.3修复了webui工具显示错误，推荐升级到Astrbot >= 4.5.3
 
