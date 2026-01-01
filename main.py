@@ -400,7 +400,7 @@ class Main(Star):
                         if title == "哔哩哔哩" and qqdocurl:
                             if "https://b23.tv" in qqdocurl:
                                 qqdocurl = await self.bili_client.b23_to_bv(qqdocurl)
-                            ret = f"视频: {desc}\n链接: {qqdocurl}"
+                            ret = f"视频/直播: {desc}\n链接: {qqdocurl}"
                             await event.send(MessageChain().message(ret))
                         news = meta.get("news", {})
                         tag = news.get("tag", "")
@@ -409,7 +409,7 @@ class Main(Star):
                         if tag == "哔哩哔哩" and jumpurl:
                             if "https://b23.tv" in jumpurl:
                                 jumpurl = await self.bili_client.b23_to_bv(jumpurl)
-                            ret = f"视频: {title}\n链接: {jumpurl}"
+                            ret = f"视频/直播: {title}\n链接: {jumpurl}"
                             await event.send(MessageChain().message(ret))
                     except json.JSONDecodeError:
                         logger.error(f"Failed to decode JSON string: {json_string}")
