@@ -15,7 +15,8 @@ BV = r"(?:\?.*)?(?:https?:\/\/)?(?:www\.)?(?:bilibili\.com\/video\/(BV[a-zA-Z0-9
 VALID_FILTER_TYPES = {"forward", "lottery", "video", "article", "draw", "live"}
 DATA_PATH = "data/astrbot_plugin_bilibili.json"
 DEFAULT_CFG = {
-    "bili_sub_list": {}  # sub_user -> [{"uid": "uid", "last": "last_dynamic_id", ...}]
+    "bili_sub_list": {},  # sub_user -> [{"uid": "uid", "last": "last_dynamic_id", ...}]
+    "credential": None,
 }
 
 # ==================== 模板注册表 ====================

@@ -1,5 +1,6 @@
 from astrbot.api.all import *
 import qrcode
+import qrcode.constants
 import io
 import re
 import base64

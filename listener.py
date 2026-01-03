@@ -3,7 +3,7 @@ import time
 import asyncio
 import traceback
 from collections import OrderedDict
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from astrbot.api import logger
 from astrbot.api.message_components import Image, Plain, Node, File
 from astrbot.api.event import MessageEventResult, MessageChain
@@ -43,7 +43,9 @@ class DynamicListener:
         """启动后台监听循环。"""
         while True:
             if self.bili_client.credential is None:
-                logger.warning("bilibili sessdata 未设置，无法获取动态")
+                logger.warning(
+                    "Bilibili 凭据未设置，无法获取动态。请使用 /bili_login 登录或在配置中设置 sessdata。"
+                )
                 await asyncio.sleep(60 * self.interval_mins)
                 continue
 
@@ -124,7 +126,7 @@ class DynamicListener:
                 sub_user, MessageEventResult(chain=chain_parts).use_t2i(False)
             )
 
-    def _cache_render(self, dyn_id: str, chain_parts: list, send_node: bool):
+    def _cache_render(self, dyn_id: Optional[str], chain_parts: list, send_node: bool):
         """缓存渲染结果，避免同一动态在不同会话重复渲染。"""
         if not dyn_id:
             return
@@ -133,7 +135,7 @@ class DynamicListener:
             self.render_cache.popitem(last=False)
 
     async def _handle_new_dynamic(
-        self, sub_user: str, render_data: Dict[str, Any], dyn_id: str = None
+        self, sub_user: str, render_data: Dict[str, Any], dyn_id: Optional[str] = None
     ):
         """处理并发送新的动态通知。"""
         cached = self.render_cache.get(dyn_id) if dyn_id else None

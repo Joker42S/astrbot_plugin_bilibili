@@ -1,8 +1,10 @@
 import re
+import os
+import tempfile
 import json
 import asyncio
 from typing import List
-
+from bilibili_api import login_v2
 from astrbot.core.star.filter.command import GreedyStr
 from astrbot.api.all import *
 from astrbot.api import logger, AstrBotConfig
@@ -49,7 +51,14 @@ class Main(Star):
 
         self.data_manager = DataManager()
         self.renderer = Renderer(self, self.rai, self.style)
-        self.bili_client = BiliClient(self.cfg.get("sessdata"))
+
+        # 优先使用 DataManager 中的凭据
+        saved_credential = self.data_manager.get_credential()
+        if saved_credential:
+            self.bili_client = BiliClient(credential_dict=saved_credential)
+        else:
+            self.bili_client = BiliClient(self.cfg.get("sessdata"))
+
         self.dynamic_listener = DynamicListener(
             context=self.context,
             data_manager=self.data_manager,
@@ -58,11 +67,75 @@ class Main(Star):
             cfg=self.cfg,
         )
         self.context.add_llm_tools(BangumiTool())
+        self._start_tasks()
+
+    def _start_tasks(self):
+        """启动或重启后台任务。"""
+        if hasattr(self, "dynamic_listener_task") and self.dynamic_listener_task:
+            self.dynamic_listener_task.cancel()
+        if hasattr(self, "refresh_task") and self.refresh_task:
+            self.refresh_task.cancel()
+
         self.dynamic_listener_task = asyncio.create_task(self.dynamic_listener.start())
+        self.refresh_task = asyncio.create_task(
+            self.bili_client.start_refresh(
+                on_refreshed=self.data_manager.set_credential
+            )
+        )
+
+    @command("bili_login")
+    @permission_type(PermissionType.ADMIN)
+    async def bili_login(self, event: AstrMessageEvent):
+        """扫码登录 Bilibili。"""
+        if event.get_group_id():
+            return MessageEventResult().message(
+                "仅支持管理员在私聊中使用'/bili_login'指令。"
+            )
+
+        login_obj = login_v2.QrCodeLogin()
+        await login_obj.generate_qrcode()
+
+        # 获取二维码图片路径
+        qr_path = os.path.join(tempfile.gettempdir(), "qrcode.png")
+
+        await event.send(
+            MessageChain()
+            .message("请使用 Bilibili App 扫描下方二维码登录：")
+            .file_image(qr_path)
+        )
+
+        # 轮询状态
+        try:
+            while True:
+                state = await login_obj.check_state()
+                if state == login_v2.QrCodeLoginEvents.DONE:
+                    credential = login_obj.get_credential()
+                    # 保存凭据
+                    self.bili_client.credential = credential
+                    cred_dict = self.bili_client.get_credential_dict()
+                    if cred_dict is not None:
+                        await self.data_manager.set_credential(cred_dict)
+                        self._start_tasks()
+                        await event.send(MessageChain().message("✅ 登录成功！"))
+                    else:
+                        await event.send(
+                            MessageChain().message("❌ 登录失败：无法获取凭据。")
+                        )
+                    break
+                elif state == login_v2.QrCodeLoginEvents.TIMEOUT:
+                    await event.send(
+                        MessageChain().message("❌ 登录超时，请重新执行 /bili_login。")
+                    )
+                    break
+
+                await asyncio.sleep(2)
+        except Exception as e:
+            logger.error(f"登录过程中发生错误: {e}")
+            await event.send(MessageChain().message(f"❌ 登录失败: {str(e)}"))
 
     @command("bili_card_style", alias={"卡片样式"})
     @permission_type(PermissionType.ADMIN)
-    async def switch_style(self, event: AstrMessageEvent, style: str = None):
+    async def switch_style(self, event: AstrMessageEvent, style: str | None = None):
         """切换动态卡片样式。不带参数可以查看可用的卡片样式列表。"""
         available = get_template_names()
 
@@ -203,11 +276,11 @@ class Main(Star):
         # 获取用户信息(可能412，故后置)
         try:
             usr_info, msg = await self.bili_client.get_user_info(int(uid))
-
-            mid = usr_info["mid"]
-            name = usr_info["name"]
-            sex = usr_info["sex"]
-            avatar = usr_info["face"]
+            if usr_info:
+                mid = usr_info["mid"]
+                name = usr_info["name"]
+                sex = usr_info["sex"]
+                avatar = usr_info["face"]
         except Exception as e:
             logger.error(f"获取用户信息失败: {e}")
 
@@ -290,7 +363,7 @@ class Main(Star):
 
     @permission_type(PermissionType.ADMIN)
     @command("bili_global_del", alias={"全局删除"})
-    async def global_sub_del(self, event: AstrMessageEvent, umo: str = None):
+    async def global_sub_del(self, event: AstrMessageEvent, umo: str = ""):
         """管理员指令。通过 UMO 删除某一个群聊或者私聊的所有订阅。"""
         if not is_valid_umo(umo):
             return MessageEventResult().message(
@@ -348,7 +421,7 @@ class Main(Star):
 
             usr_info, msg = await self.bili_client.get_user_info(int(uid))
         except Exception as e:
-            logger.error(f"获取 {usr_info['name']} 初始动态失败: {e}")
+            logger.error(f"获取初始动态失败: {e}")
         finally:
             # 保存配置
             await self.data_manager.add_subscription(umo, _sub_data)
@@ -437,7 +510,11 @@ class Main(Star):
             await self.dynamic_listener._handle_new_dynamic(sub_user, render_data)
 
     async def terminate(self):
-        if self.dynamic_listener_task and not self.dynamic_listener_task.done():
+        if (
+            hasattr(self, "dynamic_listener_task")
+            and self.dynamic_listener_task
+            and not self.dynamic_listener_task.done()
+        ):
             self.dynamic_listener_task.cancel()
             try:
                 await self.dynamic_listener_task
@@ -448,4 +525,21 @@ class Main(Star):
             except Exception as e:
                 logger.error(
                     f"Error awaiting cancellation of dynamic_listener task: {e}"
+                )
+
+        if (
+            hasattr(self, "refresh_task")
+            and self.refresh_task
+            and not self.refresh_task.done()
+        ):
+            self.refresh_task.cancel()
+            try:
+                await self.refresh_task
+            except asyncio.CancelledError:
+                logger.info(
+                    "bilibili refresh_credential task was successfully cancelled during terminate."
+                )
+            except Exception as e:
+                logger.error(
+                    f"Error awaiting cancellation of refresh_credential task: {e}"
                 )
