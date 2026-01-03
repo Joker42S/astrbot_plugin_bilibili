@@ -100,6 +100,19 @@ class DataManager:
             return True
         return False
 
+    def get_credential(self) -> Optional[Dict[str, Any]]:
+        """
+        获取保存的凭据。
+        """
+        return self.data.get("credential")
+
+    async def set_credential(self, credential_data: Dict[str, Any]):
+        """
+        保存凭据。
+        """
+        self.data["credential"] = credential_data
+        await self.save()
+
     async def update_last_dynamic_id(self, sub_user: str, uid: int, dyn_id: str):
         """
         更新订阅的最新动态ID。

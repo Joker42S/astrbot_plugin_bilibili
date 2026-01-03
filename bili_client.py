@@ -1,6 +1,7 @@
 import aiohttp
+import asyncio
 from astrbot.api import logger
-from typing import Optional, Dict, Any, Tuple
+from typing import Optional, Dict, Any, Tuple, Callable, Awaitable
 from bilibili_api import user, Credential, video
 from bilibili_api.utils.network import Api
 
@@ -10,15 +11,86 @@ class BiliClient:
     负责所有与 Bilibili API 的交互。
     """
 
-    def __init__(self, sessdata: Optional[str] = None):
+    def __init__(
+        self,
+        sessdata: Optional[str] = None,
+        credential_dict: Optional[Dict[str, Any]] = None,
+    ):
         """
         初始化 Bilibili API 客户端。
         """
         self.credential = None
-        if sessdata:
+        if credential_dict:
+            self.credential = Credential(**credential_dict)
+        elif sessdata:
             self.credential = Credential(sessdata=sessdata)
         else:
-            logger.warning("未提供 SESSDATA，部分需要登录的API可能无法使用。")
+            logger.warning("未提供 SESSDATA 或 凭据，部分需要登录的API可能无法使用。")
+
+    def set_credential(self, credential_dict: Dict[str, Any]):
+        """
+        设置凭据。
+        """
+        self.credential = Credential(**credential_dict)
+
+    def get_credential_dict(self) -> Optional[Dict[str, Any]]:
+        """
+        获取当前凭据的字典形式。
+        """
+        if not self.credential:
+            return None
+        return {
+            "sessdata": self.credential.sessdata,
+            "bili_jct": self.credential.bili_jct,
+            "buvid3": self.credential.buvid3,
+            "buvid4": self.credential.buvid4,
+            "dedeuserid": self.credential.dedeuserid,
+            "ac_time_value": self.credential.ac_time_value,
+        }
+
+    async def check_credential(self) -> bool:
+        """
+        检查凭据是否有效。
+        """
+        if not self.credential:
+            return False
+        return await self.credential.check_valid()
+
+    async def refresh_credential(self) -> bool:
+        """
+        刷新凭据。
+        """
+        if not self.credential:
+            return False
+        try:
+            if await self.credential.check_refresh():
+                await self.credential.refresh()
+                return True
+        except Exception as e:
+            logger.error(f"刷新凭据失败: {e}")
+        return False
+
+    async def start_refresh(
+        self, on_refreshed: Optional[Callable[[Dict[str, Any]], Awaitable[None]]] = None
+    ):
+        """
+        定时刷新凭据的循环。
+        :param on_refreshed: 刷新成功后的异步回调函数，接收新的凭据字典。
+        """
+        while True:
+            try:
+                if self.credential:
+                    if await self.credential.check_refresh():
+                        await self.credential.refresh()
+                        logger.info("Bilibili 凭据已自动刷新。")
+                        cred_dict = self.get_credential_dict()
+                        if on_refreshed and cred_dict is not None:
+                            await on_refreshed(cred_dict)
+            except Exception as e:
+                logger.error(f"自动刷新 Bilibili 凭据失败: {e}")
+
+            # 每 1 小时检查一次
+            await asyncio.sleep(3600)
 
     async def get_user(self, uid: int) -> user.User:
         """
@@ -78,7 +150,7 @@ class BiliClient:
         live_room = next(iter(resp.values()))
         return live_room
 
-    async def get_user_info(self, uid: int) -> Optional[Tuple[Dict[str, Any], str]]:
+    async def get_user_info(self, uid: int) -> Tuple[Optional[Dict[str, Any]], str]:
         """
         获取用户的基本信息。
         """
