@@ -28,11 +28,15 @@ plugin i https://github.com/Soulter/astrbot_plugin_bilibili
 
 ## ⚙️ 配置
 
-插件需要配置 `sessdata` 才能正常获取 Bilibili 数据。
-
-参考 [此指南](https://nemo2011.github.io/bilibili-api/#/get-credential) 获取你的 `sessdata`。
+插件至少需要配置 `sessdata` 才能正常获取 Bilibili 数据。
+以下是两种配置方式：
+1. 参考 [此指南](https://nemo2011.github.io/bilibili-api/#/get-credential) 获取你的 `sessdata`。
 
 <img width="1453" alt="image" src="https://github.com/user-attachments/assets/d5342767-8e5c-4222-81da-f1cdb4b30c95">
+
+2. 使用`/bili_login`指令获取登录二维码，扫码登录后插件会自动获取并保存凭据。
+此方式有利于解决[issue #58](https://github.com/Soulter/astrbot_plugin_bilibili/issues/58)所述412问题。不推荐使用主账号登录。
+
 
 ## 📖 使用说明
 
@@ -48,6 +52,7 @@ plugin i https://github.com/Soulter/astrbot_plugin_bilibili
 | **bili_global_sub** | `<SID> <B站UID> [过滤器...]` | **[管理员]** 为指定会话（UMO）添加对 UP 主的订阅。 | `全局订阅` |
 | **bili_sub_test** | `<B站UID>` | 测试订阅功能。仅测试获取动态与渲染图片功能，不保存订阅信息。 | `订阅测试` |
 | **bili_card_style** | `[样式名]` | **[管理员]** 切换动态卡片渲染样式。不带参数查看可用样式列表。 | `卡片样式` |
+| **bili_login** | (无) | **[管理员]** 获取二维码以登录。仅支持在私聊中触发。 | (无) |
 
 #### 过滤器说明
 
@@ -109,6 +114,10 @@ python dev_ui.py
 </a>
 
 ## 更新日志
+
+### v1.5.0
+- 引入"/bili_login"指令以登录，此前正常使用的用户无需操作
+- 类型提示修正
 
 ### v1.4.19
 - 交换指令名与指令别名，更好地用于更多平台适配器，对用户无实际影响
