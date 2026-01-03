@@ -51,14 +51,16 @@ class Renderer:
         self._templates.clear()
         self._load_all_templates()
 
-    def get_template(self, style: str = None) -> str:
+    def get_template(self, style: str | None = None) -> str:
         """获取指定样式的模板内容"""
         target_style = style or self.style
         if target_style not in self._templates:
             target_style = DEFAULT_TEMPLATE
         return self._templates.get(target_style, "")
 
-    async def render_dynamic(self, render_data: Dict[str, Any], style: str = None):
+    async def render_dynamic(
+        self, render_data: Dict[str, Any], style: str | None = None
+    ):
         """
         将渲染数据字典渲染成最终图片。
         这是该类的主要入口方法。

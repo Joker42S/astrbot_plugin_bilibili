@@ -1,7 +1,7 @@
 import aiohttp
 import asyncio
 from astrbot.api import logger
-from typing import Optional, Dict, Any, Tuple, Callable, Awaitable
+from typing import NoReturn, Optional, Dict, Any, Tuple, Callable, Awaitable
 from bilibili_api import user, Credential, video
 from bilibili_api.utils.network import Api
 
@@ -15,7 +15,7 @@ class BiliClient:
         self,
         sessdata: Optional[str] = None,
         credential_dict: Optional[Dict[str, Any]] = None,
-    ):
+    ) -> None:
         """
         初始化 Bilibili API 客户端。
         """
@@ -27,7 +27,7 @@ class BiliClient:
         else:
             logger.warning("未提供 SESSDATA 或 凭据，部分需要登录的API可能无法使用。")
 
-    def set_credential(self, credential_dict: Dict[str, Any]):
+    def set_credential(self, credential_dict: Dict[str, Any]) -> None:
         """
         设置凭据。
         """
@@ -71,21 +71,30 @@ class BiliClient:
         return False
 
     async def start_refresh(
-        self, on_refreshed: Optional[Callable[[Dict[str, Any]], Awaitable[None]]] = None
+        self,
+        on_refreshed: Optional[
+            Callable[[Dict[str, Any] | None], Awaitable[None]]
+        ] = None,
     ):
         """
         定时刷新凭据的循环。
         :param on_refreshed: 刷新成功后的异步回调函数，接收新的凭据字典。
         """
+        if (
+            not self.credential
+            or not self.credential.sessdata
+            or not self.credential.bili_jct
+        ):
+            return
+
         while True:
             try:
                 if self.credential:
                     if await self.credential.check_refresh():
                         await self.credential.refresh()
                         logger.info("Bilibili 凭据已自动刷新。")
-                        cred_dict = self.get_credential_dict()
-                        if on_refreshed and cred_dict is not None:
-                            await on_refreshed(cred_dict)
+                        if on_refreshed:
+                            await on_refreshed(self.get_credential_dict())
             except Exception as e:
                 logger.error(f"自动刷新 Bilibili 凭据失败: {e}")
 
@@ -116,7 +125,7 @@ class BiliClient:
         获取用户的最新动态。
         """
         try:
-            u = await self.get_user(uid)
+            u: user.User = await self.get_user(uid)
             return await u.get_dynamics_new()
         except Exception as e:
             logger.error(f"获取用户动态失败 (UID: {uid}): {e}")
@@ -128,7 +137,7 @@ class BiliClient:
         DEPRECATED: 该方法已弃用，据反馈易引起412错误
         """
         try:
-            u = await self.get_user(uid)
+            u: user.User = await self.get_user(uid)
             # 上游接口同u.get_user_info，即"https://api.bilibili.com/x/space/wbi/acc/info"，412的诱因
             return await u.get_live_info()
         except Exception as e:
@@ -143,19 +152,19 @@ class BiliClient:
             "params": {"uids[]": "list<int>: 主播uid列表"},
             "comment": "通过主播uid列表获取直播间状态信息（是否在直播、房间号等）",
         }
-        params = {"uids[]": uids}
+        params: Dict[str, list[int]] = {"uids[]": uids}
         resp = await Api(**API_CONFIG, no_csrf=True).update_params(**params).result
         if not isinstance(resp, dict) or not resp:
             return None
         live_room = next(iter(resp.values()))
         return live_room
 
-    async def get_user_info(self, uid: int) -> Tuple[Optional[Dict[str, Any]], str]:
+    async def get_user_info(self, uid: int) -> Tuple[Dict[str, Any] | None, str]:
         """
         获取用户的基本信息。
         """
         try:
-            u = await self.get_user(uid)
+            u: user.User = await self.get_user(uid)
             info = await u.get_user_info()
             return info, ""
         except Exception as e:
@@ -170,7 +179,7 @@ class BiliClient:
         """
         b23短链转换为原始链接
         """
-        headers = {
+        headers: Dict[str, str] = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
         }
         async with aiohttp.ClientSession() as session:
@@ -179,9 +188,9 @@ class BiliClient:
                     url=url, headers=headers, allow_redirects=False, timeout=10
                 ) as response:
                     if 300 <= response.status < 400:
-                        location_url = response.headers.get("Location")
+                        location_url: str | None = response.headers.get("Location")
                         if location_url:
-                            base_url = location_url.split("?", 1)[0]
+                            base_url: str = location_url.split("?", 1)[0]
                             return base_url
             except Exception as e:
                 logger.error(f"解析b23链接失败 (URL: {url}): {e}")

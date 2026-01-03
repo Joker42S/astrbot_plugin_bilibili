@@ -106,10 +106,12 @@ class DataManager:
         """
         return self.data.get("credential")
 
-    async def set_credential(self, credential_data: Dict[str, Any]):
+    async def set_credential(self, credential_data: Dict[str, Any] | None):
         """
         保存凭据。
         """
+        if credential_data is None:
+            raise ValueError("credential_data 不能为空")
         self.data["credential"] = credential_data
         await self.save()
 

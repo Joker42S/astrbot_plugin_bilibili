@@ -87,6 +87,11 @@ class Main(Star):
     @permission_type(PermissionType.ADMIN)
     async def bili_login(self, event: AstrMessageEvent):
         """扫码登录 Bilibili。"""
+        if event.get_group_id():
+            return MessageEventResult().message(
+                "仅支持管理员在私聊中使用'/bili_login'指令。"
+            )
+
         login_obj = login_v2.QrCodeLogin()
         await login_obj.generate_qrcode()
 
@@ -113,7 +118,9 @@ class Main(Star):
                         self._start_tasks()
                         await event.send(MessageChain().message("✅ 登录成功！"))
                     else:
-                        await event.send(MessageChain().message("❌ 登录失败：无法获取凭据。"))
+                        await event.send(
+                            MessageChain().message("❌ 登录失败：无法获取凭据。")
+                        )
                     break
                 elif state == login_v2.QrCodeLoginEvents.TIMEOUT:
                     await event.send(
@@ -128,7 +135,7 @@ class Main(Star):
 
     @command("bili_card_style", alias={"卡片样式"})
     @permission_type(PermissionType.ADMIN)
-    async def switch_style(self, event: AstrMessageEvent, style: str = None):
+    async def switch_style(self, event: AstrMessageEvent, style: str | None = None):
         """切换动态卡片样式。不带参数可以查看可用的卡片样式列表。"""
         available = get_template_names()
 
@@ -269,11 +276,11 @@ class Main(Star):
         # 获取用户信息(可能412，故后置)
         try:
             usr_info, msg = await self.bili_client.get_user_info(int(uid))
-
-            mid = usr_info["mid"]
-            name = usr_info["name"]
-            sex = usr_info["sex"]
-            avatar = usr_info["face"]
+            if usr_info:
+                mid = usr_info["mid"]
+                name = usr_info["name"]
+                sex = usr_info["sex"]
+                avatar = usr_info["face"]
         except Exception as e:
             logger.error(f"获取用户信息失败: {e}")
 
@@ -414,7 +421,7 @@ class Main(Star):
 
             usr_info, msg = await self.bili_client.get_user_info(int(uid))
         except Exception as e:
-            logger.error(f"获取 {usr_info['name']} 初始动态失败: {e}")
+            logger.error(f"获取初始动态失败: {e}")
         finally:
             # 保存配置
             await self.data_manager.add_subscription(umo, _sub_data)
