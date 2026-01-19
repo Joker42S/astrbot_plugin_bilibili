@@ -109,10 +109,10 @@ class Renderer:
         render_data = await create_render_data()
         render_data["banner"] = await image_to_base64(BANNER_PATH)
         # 用户名称、头像、挂件
-        author_module = item.get("modules", {}).get("module_author", {})
+        author_module = item.get("modules", {}).get("module_author") or {}
         render_data["name"] = author_module.get("name")
         render_data["avatar"] = author_module.get("face")
-        render_data["pendant"] = author_module.get("pendant", {}).get("image")
+        render_data["pendant"] = (author_module.get("pendant") or {}).get("image")
         render_data["type"] = item.get("type")
 
         # 根据不同动态类型填充数据

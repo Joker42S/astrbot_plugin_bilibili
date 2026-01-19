@@ -1,7 +1,7 @@
 import aiohttp
 import asyncio
 from astrbot.api import logger
-from typing import NoReturn, Optional, Dict, Any, Tuple, Callable, Awaitable
+from typing import Optional, Dict, Any, Tuple, Callable, Awaitable
 from bilibili_api import user, Credential, video
 from bilibili_api.utils.network import Api
 
