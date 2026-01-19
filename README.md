@@ -53,6 +53,7 @@ plugin i https://github.com/Soulter/astrbot_plugin_bilibili
 | **bili_sub_test** | `<B站UID>` | 测试订阅功能。仅测试获取动态与渲染图片功能，不保存订阅信息。 | `订阅测试` |
 | **bili_card_style** | `[样式名]` | **[管理员]** 切换动态卡片渲染样式。不带参数查看可用样式列表。 | `卡片样式` |
 | **bili_login** | (无) | **[管理员]** 获取二维码以登录。仅支持在私聊中触发。 | (无) |
+| **bili_logout** | (无) | **[管理员]** 删除已保存的登录凭据，转而采用配置项中的sessdata（如果有） | (无) |
 
 #### 过滤器说明
 
@@ -107,6 +108,8 @@ cd astrbot_plugin_bilibili
 python dev_ui.py
 ```
 
+[astrbot-t2i-playground](https://github.com/AstrBotDevs/astrbot-t2i-playground) 也可以帮助开发和调试模板。
+
 ## Contributors
 
 <a href="https://github.com/soulter/astrbot_plugin_bilibili/graphs/contributors">
@@ -115,15 +118,10 @@ python dev_ui.py
 
 ## 更新日志
 
-### v1.5.0
-- 引入"/bili_login"指令以登录，此前正常使用的用户无需操作
-- 类型提示修正
+### v1.5.1
+- 新增登出指令 `/bili_logout`，可删除已保存的登录凭据。
+- 修复一些小问题
 
-### v1.4.19
-- 交换指令名与指令别名，更好地用于更多平台适配器，对用户无实际影响
-- 相同动态对应图片不再重复渲染
-- 修复小程序解析错误
-- 图片质量提升等小改动
 
 ‼️astrbot_plugin_bilibili >= v1.4.14 需要 Astrbot >= 4.5.2；原因是使用了Astrbot >= 4.5.2推荐的函数调用写法，而Astrbot >= 4.5.3修复了webui工具显示错误，推荐升级到Astrbot >= 4.5.3
 
