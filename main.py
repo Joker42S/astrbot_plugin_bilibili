@@ -28,7 +28,6 @@ from .constant import (
     VALID_FILTER_TYPES,
     BV,
     LOGO_PATH,
-    BANNER_PATH,
     CARD_TEMPLATES,
     DEFAULT_TEMPLATE,
     get_template_names,
@@ -57,7 +56,7 @@ class Main(Star):
         if saved_credential:
             self.bili_client = BiliClient(credential_dict=saved_credential)
         else:
-            self.bili_client = BiliClient(self.cfg.get("sessdata"))
+            self.bili_client = BiliClient(sessdata=self.cfg.get("sessdata"))
 
         self.dynamic_listener = DynamicListener(
             context=self.context,
@@ -132,6 +131,17 @@ class Main(Star):
         except Exception as e:
             logger.error(f"登录过程中发生错误: {e}")
             await event.send(MessageChain().message(f"❌ 登录失败: {str(e)}"))
+
+    @command("bili_logout")
+    @permission_type(PermissionType.ADMIN)
+    async def bili_logout(self):
+        """登出 Bilibili，清除凭据。"""
+        self.bili_client.credential = None
+        await self.data_manager.clear_credential()
+        self.bili_client = BiliClient(sessdata=self.cfg.get("sessdata"))
+        self.dynamic_listener.bili_client = self.bili_client
+        self._start_tasks()
+        return MessageEventResult().message("✅ 已登出 Bilibili，凭据已清除。")
 
     @command("bili_card_style", alias={"卡片样式"})
     @permission_type(PermissionType.ADMIN)

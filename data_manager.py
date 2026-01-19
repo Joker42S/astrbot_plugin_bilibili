@@ -115,6 +115,14 @@ class DataManager:
         self.data["credential"] = credential_data
         await self.save()
 
+    async def clear_credential(self):
+        """
+        清除保存的凭据。
+        """
+        if "credential" in self.data:
+            del self.data["credential"]
+            await self.save()
+
     async def update_last_dynamic_id(self, sub_user: str, uid: int, dyn_id: str):
         """
         更新订阅的最新动态ID。
@@ -150,7 +158,7 @@ class DataManager:
 
         sub_to_remove = None
         for sub in user_subs:
-            if sub.get("uid") == uid:
+            if sub.get("uid") == str(uid) or sub.get("uid") == uid:
                 sub_to_remove = sub
                 break
 
