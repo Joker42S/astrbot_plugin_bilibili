@@ -3,7 +3,7 @@ import time
 import asyncio
 import traceback
 from collections import OrderedDict
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from astrbot.api import logger
 from astrbot.api.message_components import Image, Plain, Node, File
 from astrbot.api.event import MessageEventResult, MessageChain
@@ -238,6 +238,24 @@ class DynamicListener:
 
         return new_items
 
+    def _match_filter_regex(
+        self, text: Optional[str], filter_regex: List[str], log_template: str
+    ) -> bool:
+        """检测文本是否命中过滤正则"""
+        if not text or not filter_regex:
+            return False
+
+        for regex_pattern in filter_regex:
+            try:
+                if re.search(regex_pattern, text):
+                    logger.info(log_template.format(regex_pattern=regex_pattern))
+                    return True
+            except re.error:
+                logger.warning(f"无效的正则表达式: {regex_pattern}")
+                continue
+
+        return False
+
     async def _parse_and_filter_dynamics(self, dyn: Dict, data: Dict):
         """
         解析并过滤动态。
@@ -264,19 +282,11 @@ class DynamicListener:
                     content_text = item["modules"]["module_dynamic"]["desc"]["text"]
                 except (TypeError, KeyError):
                     content_text = None
-                if content_text and filter_regex:
-                    matched = False
-                    for regex_pattern in filter_regex:
-                        try:
-                            if re.search(regex_pattern, content_text):
-                                logger.info(f"转发内容匹配正则 {regex_pattern}。")
-                                result_list.append((None, dyn_id))
-                                matched = True
-                                break
-                        except re.error as e:
-                            continue
-                    if matched:
-                        continue
+                if self._match_filter_regex(
+                    content_text, filter_regex, "转发内容匹配正则 {regex_pattern}。"
+                ):
+                    result_list.append((None, dyn_id))
+                    continue
                 render_data = await self.renderer.build_render_data(item)
                 render_data["uid"] = uid
                 render_data["url"] = f"https://t.bilibili.com/{dyn_id}"
@@ -315,21 +325,13 @@ class DynamicListener:
                     logger.info(f"互动抽奖在过滤列表 {filter_types} 中。")
                     result_list.append((None, dyn_id))
                     continue
-                if filter_regex:  # 检查列表是否存在且不为空
-                    matched = False
-                    for regex_pattern in filter_regex:
-                        try:
-                            if re.search(regex_pattern, summary_text):
-                                logger.info(
-                                    f"图文动态 {dyn_id} 的 summary 匹配正则 '{regex_pattern}'。"
-                                )
-                                result_list.append((None, dyn_id))
-                                matched = True
-                                break
-                        except re.error as e:
-                            continue  # 如果正则表达式本身有误，跳过这个正则继续检查下一个
-                    if matched:
-                        continue
+                if self._match_filter_regex(
+                    summary_text,
+                    filter_regex,
+                    f"图文动态 {dyn_id} 的 summary 匹配正则 '{{regex_pattern}}'。",
+                ):
+                    result_list.append((None, dyn_id))
+                    continue
                 render_data = await self.renderer.build_render_data(item)
                 render_data["uid"] = uid
                 result_list.append((render_data, dyn_id))
