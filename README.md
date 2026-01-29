@@ -65,6 +65,7 @@ plugin i https://github.com/Soulter/astrbot_plugin_bilibili
   - `article`：过滤掉专栏动态。
   - `draw`：过滤掉图文动态。
   - `live`：过滤掉直播动态。
+  - `forward_lottery`：过滤掉转发的互动抽奖动态。
   - **正则表达式**：任何不属于上述关键字的字符串都将被视为正则表达式，用于过滤动态文本内容。
 
 **示例**：
@@ -118,10 +119,9 @@ python dev_ui.py
 
 ## 更新日志
 
-### v1.5.1
-- 新增登出指令 `/bili_logout`，可删除已保存的登录凭据。
-- 修复一些小问题
-
+##  v1.5.2
+- 增强lottery过滤，涵盖开奖信息
+- 新增转发互动抽奖过滤，以forward_lottery标识
 
 ‼️astrbot_plugin_bilibili >= v1.4.14 需要 Astrbot >= 4.5.2；原因是使用了Astrbot >= 4.5.2推荐的函数调用写法，而Astrbot >= 4.5.3修复了webui工具显示错误，推荐升级到Astrbot >= 4.5.3
 

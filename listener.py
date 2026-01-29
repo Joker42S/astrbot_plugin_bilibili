@@ -291,7 +291,14 @@ class DynamicListener:
                 try:
                     content_text = item["modules"]["module_dynamic"]["desc"]["text"]
                 except (TypeError, KeyError):
-                    content_text = None
+                    content_text = ""
+                if "lottery" in filter_types and re.search(
+                    r"恭喜.*等\d+位同学中奖，已私信通知，详情请点击抽奖查看。",
+                    content_text,
+                ):
+                    logger.info(f"转发内容为抽奖在过滤列表 {filter_types} 中。")
+                    result_list.append((None, dyn_id))
+                    continue
                 if self._match_filter_regex(
                     content_text, filter_regex, "转发内容匹配正则 {regex_pattern}。"
                 ):
