@@ -273,6 +273,16 @@ class DynamicListener:
             dyn_id = item["id_str"]
             # 转发类型
             if item.get("type") == "DYNAMIC_TYPE_FORWARD":
+                if (
+                    "forward_lottery" in filter_types
+                    and item["orig"]["modules"]["module_dynamic"]["major"]["opus"][
+                        "summary"
+                    ]["rich_text_nodes"][0].get("text")
+                    == "互动抽奖"
+                ):
+                    logger.info(f"转发互动抽奖在过滤列表 {filter_types} 中。")
+                    result_list.append((None, dyn_id))
+                    continue
                 if "forward" in filter_types:
                     logger.info(f"转发类型在过滤列表 {filter_types} 中。")
                     # return None, dyn_id  # 返回 None 表示不推送，但更新 dyn_id
