@@ -271,113 +271,152 @@ class DynamicListener:
 
         for item in items:
             dyn_id = item["id_str"]
-            # 转发类型
-            if item.get("type") == "DYNAMIC_TYPE_FORWARD":
-                if (
-                    "forward_lottery" in filter_types
-                    and item["orig"]["modules"]["module_dynamic"]["major"]["opus"][
-                        "summary"
-                    ]["rich_text_nodes"][0].get("text")
-                    == "互动抽奖"
-                ):
-                    logger.info(f"转发互动抽奖在过滤列表 {filter_types} 中。")
-                    result_list.append((None, dyn_id))
-                    continue
-                if "forward" in filter_types:
-                    logger.info(f"转发类型在过滤列表 {filter_types} 中。")
-                    # return None, dyn_id  # 返回 None 表示不推送，但更新 dyn_id
-                    result_list.append((None, dyn_id))
-                    continue
-                try:
-                    content_text = item["modules"]["module_dynamic"]["desc"]["text"]
-                except (TypeError, KeyError):
-                    content_text = ""
-                if "lottery" in filter_types and re.search(
-                    r"恭喜.*等\d+位同学中奖，已私信通知，详情请点击抽奖查看。",
-                    content_text,
-                ):
-                    logger.info(f"转发内容为抽奖在过滤列表 {filter_types} 中。")
-                    result_list.append((None, dyn_id))
-                    continue
-                if self._match_filter_regex(
-                    content_text, filter_regex, "转发内容匹配正则 {regex_pattern}。"
-                ):
-                    result_list.append((None, dyn_id))
-                    continue
-                render_data = await self.renderer.build_render_data(item)
-                render_data["uid"] = uid
-                render_data["url"] = f"https://t.bilibili.com/{dyn_id}"
-                render_data["qrcode"] = await create_qrcode(render_data["url"])
+            item_type = item.get("type")
 
-                render_forward = await self.renderer.build_render_data(
-                    item["orig"], is_forward=True
+            if item_type == "DYNAMIC_TYPE_FORWARD":
+                result = await self._handle_forward_dynamic(
+                    item, dyn_id, uid, filter_types, filter_regex
                 )
-                if render_forward["image_urls"]:  # 检查列表是否非空
-                    render_forward["image_urls"] = [
-                        render_forward["image_urls"][0]
-                    ]  # 保留第一项
-                render_data["forward"] = render_forward
-                result_list.append((render_data, dyn_id))
-            elif item.get("type") in ("DYNAMIC_TYPE_DRAW", "DYNAMIC_TYPE_WORD"):
-                # 图文类型过滤
-                if "draw" in filter_types:
-                    logger.info(f"图文类型在过滤列表 {filter_types} 中。")
-                    result_list.append((None, dyn_id))
-                    continue
-
-                major = (
-                    item.get("modules", {}).get("module_dynamic", {}).get("major", {})
+            elif item_type in ("DYNAMIC_TYPE_DRAW", "DYNAMIC_TYPE_WORD"):
+                result = await self._handle_draw_or_word_dynamic(
+                    item, dyn_id, uid, filter_types, filter_regex
                 )
-                if major.get("type") == "MAJOR_TYPE_BLOCKED":
-                    logger.info(f"图文动态 {dyn_id} 为充电专属。")
-                    result_list.append((None, dyn_id))
-                    continue
-                opus = major["opus"]
-                summary_text = opus["summary"]["text"]
-
-                if (
-                    opus["summary"]["rich_text_nodes"][0].get("text") == "互动抽奖"
-                    and "lottery" in filter_types
-                ):
-                    logger.info(f"互动抽奖在过滤列表 {filter_types} 中。")
-                    result_list.append((None, dyn_id))
-                    continue
-                if self._match_filter_regex(
-                    summary_text,
-                    filter_regex,
-                    f"图文动态 {dyn_id} 的 summary 匹配正则 '{{regex_pattern}}'。",
-                ):
-                    result_list.append((None, dyn_id))
-                    continue
-                render_data = await self.renderer.build_render_data(item)
-                render_data["uid"] = uid
-                result_list.append((render_data, dyn_id))
-            elif item.get("type") == "DYNAMIC_TYPE_AV":
-                # 视频类型过滤
-                if "video" in filter_types:
-                    logger.info(f"视频类型在过滤列表 {filter_types} 中。")
-                    result_list.append((None, dyn_id))
-                    continue
-                render_data = await self.renderer.build_render_data(item)
-                render_data["uid"] = uid
-                result_list.append((render_data, dyn_id))
-            elif item.get("type") == "DYNAMIC_TYPE_ARTICLE":
-                # 文章类型过滤
-                if "article" in filter_types:
-                    logger.info(f"文章类型在过滤列表 {filter_types} 中。")
-                    result_list.append((None, dyn_id))
-                    continue
-                major = (
-                    item.get("modules", {}).get("module_dynamic", {}).get("major", {})
+            elif item_type == "DYNAMIC_TYPE_AV":
+                result = await self._handle_video_dynamic(
+                    item, dyn_id, uid, filter_types
                 )
-                if major.get("type") == "MAJOR_TYPE_BLOCKED":
-                    logger.info(f"文章 {dyn_id} 为充电专属。")
-                    result_list.append((None, dyn_id))
-                    continue
-                render_data = await self.renderer.build_render_data(item)
-                render_data["uid"] = uid
-                result_list.append((render_data, dyn_id))
+            elif item_type == "DYNAMIC_TYPE_ARTICLE":
+                result = await self._handle_article_dynamic(
+                    item, dyn_id, uid, filter_types
+                )
             else:
-                result_list.append((None, None))
+                result = (None, None)
+
+            result_list.append(result)
 
         return result_list
+
+    async def _handle_forward_dynamic(
+        self,
+        item: Dict,
+        dyn_id: str,
+        uid: str,
+        filter_types: List[str],
+        filter_regex: List[str],
+    ) -> tuple:
+        """处理转发动态的过滤与渲染数据准备。"""
+        try:
+            is_forward_lottery = (
+                item["orig"]["modules"]["module_dynamic"]["major"]["opus"][
+                    "summary"
+                ]["rich_text_nodes"][0].get("text")
+                == "互动抽奖"
+            )
+        except (KeyError, TypeError):
+            is_forward_lottery = False
+
+        if "forward_lottery" in filter_types and is_forward_lottery:
+            logger.info(f"转发互动抽奖在过滤列表 {filter_types} 中。")
+            return (None, dyn_id)
+
+        if "forward" in filter_types:
+            logger.info(f"转发类型在过滤列表 {filter_types} 中。")
+            return (None, dyn_id)
+
+        try:
+            content_text = item["modules"]["module_dynamic"]["desc"]["text"]
+        except (TypeError, KeyError):
+            content_text = ""
+
+        if "lottery" in filter_types and re.search(
+            r"恭喜.*等\d+位同学中奖，已私信通知，详情请点击抽奖查看。",
+            content_text,
+        ):
+            logger.info(f"转发内容为抽奖在过滤列表 {filter_types} 中。")
+            return (None, dyn_id)
+
+        if self._match_filter_regex(
+            content_text, filter_regex, "转发内容匹配正则 {regex_pattern}。"
+        ):
+            return (None, dyn_id)
+
+        render_data = await self.renderer.build_render_data(item)
+        render_data["uid"] = uid
+        render_data["url"] = f"https://t.bilibili.com/{dyn_id}"
+        render_data["qrcode"] = await create_qrcode(render_data["url"])
+
+        render_forward = await self.renderer.build_render_data(
+            item.get("orig", {}), is_forward=True
+        )
+        if render_forward.get("image_urls"):
+            render_forward["image_urls"] = [render_forward["image_urls"][0]]
+        render_data["forward"] = render_forward
+        return (render_data, dyn_id)
+
+    async def _handle_draw_or_word_dynamic(
+        self,
+        item: Dict,
+        dyn_id: str,
+        uid: str,
+        filter_types: List[str],
+        filter_regex: List[str],
+    ) -> tuple:
+        """处理图文/文字动态。"""
+        if "draw" in filter_types:
+            logger.info(f"图文类型在过滤列表 {filter_types} 中。")
+            return (None, dyn_id)
+
+        major = item.get("modules", {}).get("module_dynamic", {}).get("major", {})
+        if major.get("type") == "MAJOR_TYPE_BLOCKED":
+            logger.info(f"图文动态 {dyn_id} 为充电专属。")
+            return (None, dyn_id)
+
+        opus = major.get("opus", {})
+        summary = opus.get("summary", {})
+        summary_text = summary.get("text", "")
+        rich_nodes = summary.get("rich_text_nodes", [])
+        first_node_text = rich_nodes[0].get("text") if rich_nodes else ""
+
+        if first_node_text == "互动抽奖" and "lottery" in filter_types:
+            logger.info(f"互动抽奖在过滤列表 {filter_types} 中。")
+            return (None, dyn_id)
+
+        if self._match_filter_regex(
+            summary_text,
+            filter_regex,
+            f"图文动态 {dyn_id} 的 summary 匹配正则 '{{regex_pattern}}'。",
+        ):
+            return (None, dyn_id)
+
+        render_data = await self.renderer.build_render_data(item)
+        render_data["uid"] = uid
+        return (render_data, dyn_id)
+
+    async def _handle_video_dynamic(
+        self, item: Dict, dyn_id: str, uid: str, filter_types: List[str]
+    ) -> tuple:
+        """处理视频动态。"""
+        if "video" in filter_types:
+            logger.info(f"视频类型在过滤列表 {filter_types} 中。")
+            return (None, dyn_id)
+
+        render_data = await self.renderer.build_render_data(item)
+        render_data["uid"] = uid
+        return (render_data, dyn_id)
+
+    async def _handle_article_dynamic(
+        self, item: Dict, dyn_id: str, uid: str, filter_types: List[str]
+    ) -> tuple:
+        """处理专栏文章动态。"""
+        if "article" in filter_types:
+            logger.info(f"文章类型在过滤列表 {filter_types} 中。")
+            return (None, dyn_id)
+
+        major = item.get("modules", {}).get("module_dynamic", {}).get("major", {})
+        if major.get("type") == "MAJOR_TYPE_BLOCKED":
+            logger.info(f"文章 {dyn_id} 为充电专属。")
+            return (None, dyn_id)
+
+        render_data = await self.renderer.build_render_data(item)
+        render_data["uid"] = uid
+        return (render_data, dyn_id)
