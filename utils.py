@@ -1,12 +1,13 @@
-from astrbot.api.all import *
-import qrcode
-import qrcode.constants
+import base64
 import io
 import re
-import base64
 from urllib.parse import urlparse
-from PIL import Image as PILImage
+
+import qrcode
+import qrcode.constants
 from astrbot.api import logger
+from astrbot.api.all import *
+from PIL import Image as PILImage
 
 
 async def create_render_data() -> dict:

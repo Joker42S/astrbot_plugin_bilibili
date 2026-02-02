@@ -1,38 +1,39 @@
-import re
-import os
-import tempfile
-import json
 import asyncio
+import json
+import os
+import re
+import tempfile
 from typing import List
-from bilibili_api import login_v2
-from astrbot.core.star.filter.command import GreedyStr
-from astrbot.api.all import *
-from astrbot.api import logger, AstrBotConfig
-from astrbot.api.message_components import Image, Plain
-from astrbot.api.event import MessageEventResult, AstrMessageEvent, MessageChain
-from astrbot.api.event.filter import (
-    command,
-    regex,
-    permission_type,
-    PermissionType,
-    event_message_type,
-    EventMessageType,
-)
 
-from .utils import *
-from .renderer import Renderer
+from astrbot.api import AstrBotConfig, logger
+from astrbot.api.all import *
+from astrbot.api.event import AstrMessageEvent, MessageChain, MessageEventResult
+from astrbot.api.event.filter import (
+    EventMessageType,
+    PermissionType,
+    command,
+    event_message_type,
+    permission_type,
+    regex,
+)
+from astrbot.api.message_components import Image, Plain
+from astrbot.core.star.filter.command import GreedyStr
+from bilibili_api import login_v2
+
 from .bili_client import BiliClient
-from .listener import DynamicListener
-from .data_manager import DataManager
 from .constant import (
-    VALID_FILTER_TYPES,
     BV,
-    LOGO_PATH,
     CARD_TEMPLATES,
     DEFAULT_TEMPLATE,
+    LOGO_PATH,
+    VALID_FILTER_TYPES,
     get_template_names,
 )
+from .data_manager import DataManager
+from .listener import DynamicListener
+from .renderer import Renderer
 from .tools.bangumi import BangumiTool
+from .utils import *
 
 
 @register("astrbot_plugin_bilibili", "Soulter", "", "", "")

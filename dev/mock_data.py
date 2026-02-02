@@ -3,10 +3,11 @@ UI 开发模式 - 模拟数据模块
 提供各种动态类型和元数据组合的模拟数据，用于 UI 开发和测试
 """
 
-import os
 import base64
 import io
-from typing import Dict, Any, List, Optional
+import os
+from typing import Any, Dict, List, Optional
+
 import qrcode
 
 # ==================== 基础工具函数 ====================

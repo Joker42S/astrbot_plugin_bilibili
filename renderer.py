@@ -1,18 +1,20 @@
-import os
 import asyncio
-from .utils import *
-from typing import Dict, Any
+import os
+from typing import Any, Dict
+
 from astrbot.api import logger
 from astrbot.api.all import Star
+
 from .constant import (
-    LOGO_PATH,
     BANNER_PATH,
-    MAX_ATTEMPTS,
-    RETRY_DELAY,
     CARD_TEMPLATES,
     DEFAULT_TEMPLATE,
+    LOGO_PATH,
+    MAX_ATTEMPTS,
+    RETRY_DELAY,
     get_template_path,
 )
+from .utils import *
 
 
 def load_template(style: str) -> str:

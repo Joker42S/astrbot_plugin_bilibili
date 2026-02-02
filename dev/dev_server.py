@@ -3,13 +3,13 @@ UI 开发模式 - 本地预览服务器
 提供实时预览和热重载功能，专注于 UI 开发
 """
 
+import json
 import os
 import sys
-import json
-from pathlib import Path
-from http.server import HTTPServer, SimpleHTTPRequestHandler
-from urllib.parse import parse_qs, urlparse
 import webbrowser
+from http.server import HTTPServer, SimpleHTTPRequestHandler
+from pathlib import Path
+from urllib.parse import parse_qs, urlparse
 
 # 添加父目录到路径
 CURRENT_DIR = Path(__file__).parent
@@ -17,8 +17,9 @@ PROJECT_ROOT = CURRENT_DIR.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from jinja2 import Template
-from dev.mock_data import get_scenarios_by_category, get_scenario_by_name
+
 from constant import CARD_TEMPLATES, DEFAULT_TEMPLATE, get_template_path
+from dev.mock_data import get_scenario_by_name, get_scenarios_by_category
 
 
 def get_template(style: str = DEFAULT_TEMPLATE) -> str:
@@ -61,19 +62,19 @@ CONTROL_PANEL_HTML = """
             padding: 0;
             box-sizing: border-box;
         }
-        
+
         body {
             font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
             background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
             min-height: 100vh;
             color: #e8e8e8;
         }
-        
+
         .container {
             display: flex;
             height: 100vh;
         }
-        
+
         /* 左侧控制面板 */
         .sidebar {
             width: 320px;
@@ -83,14 +84,14 @@ CONTROL_PANEL_HTML = """
             overflow-y: auto;
             padding: 20px;
         }
-        
+
         .logo {
             text-align: center;
             padding: 20px 0;
             border-bottom: 1px solid rgba(255, 255, 255, 0.1);
             margin-bottom: 20px;
         }
-        
+
         .logo h1 {
             font-size: 1.5rem;
             background: linear-gradient(90deg, #fb7299, #ffc0cb);
@@ -98,17 +99,17 @@ CONTROL_PANEL_HTML = """
             -webkit-text-fill-color: transparent;
             background-clip: text;
         }
-        
+
         .logo p {
             font-size: 0.85rem;
             color: #888;
             margin-top: 5px;
         }
-        
+
         .category {
             margin-bottom: 20px;
         }
-        
+
         .category-title {
             font-size: 0.9rem;
             color: #fb7299;
@@ -118,7 +119,7 @@ CONTROL_PANEL_HTML = """
             margin-bottom: 10px;
             font-weight: 600;
         }
-        
+
         .scenario-btn {
             display: block;
             width: 100%;
@@ -133,18 +134,18 @@ CONTROL_PANEL_HTML = """
             font-size: 0.85rem;
             transition: all 0.2s ease;
         }
-        
+
         .scenario-btn:hover {
             background: rgba(251, 114, 153, 0.2);
             border-color: rgba(251, 114, 153, 0.5);
             transform: translateX(5px);
         }
-        
+
         .scenario-btn.active {
             background: rgba(251, 114, 153, 0.3);
             border-color: #fb7299;
         }
-        
+
         /* 右侧预览区 */
         .preview-area {
             flex: 1;
@@ -152,7 +153,7 @@ CONTROL_PANEL_HTML = """
             flex-direction: column;
             overflow: hidden;
         }
-        
+
         .toolbar {
             display: flex;
             align-items: center;
@@ -161,7 +162,7 @@ CONTROL_PANEL_HTML = """
             background: rgba(0, 0, 0, 0.3);
             border-bottom: 1px solid rgba(255, 255, 255, 0.1);
         }
-        
+
         .toolbar-btn {
             padding: 8px 16px;
             background: rgba(251, 114, 153, 0.2);
@@ -172,7 +173,7 @@ CONTROL_PANEL_HTML = """
             font-size: 0.85rem;
             transition: all 0.2s ease;
         }
-        
+
         .toolbar-btn:hover {
             background: rgba(251, 114, 153, 0.4);
         }
@@ -186,18 +187,18 @@ CONTROL_PANEL_HTML = """
             outline: none;
             font-size: 0.85rem;
         }
-        
+
         .current-scenario {
             flex: 1;
             font-size: 0.9rem;
             color: #888;
         }
-        
+
         .current-scenario span {
             color: #ffc0cb;
             font-weight: 600;
         }
-        
+
         .preview-container {
             flex: 1;
             overflow: auto;
@@ -206,19 +207,19 @@ CONTROL_PANEL_HTML = """
             justify-content: center;
             align-items: flex-start;
         }
-        
+
         .preview-frame {
             background: transparent;
             border-radius: 12px;
             overflow: hidden;
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
         }
-        
+
         .preview-frame iframe {
             border: none;
             display: block;
         }
-        
+
         /* 数据面板 */
         .data-panel {
             position: fixed;
@@ -234,11 +235,11 @@ CONTROL_PANEL_HTML = """
             display: flex;
             flex-direction: column;
         }
-        
+
         .data-panel.open {
             transform: translateX(0);
         }
-        
+
         .data-panel-header {
             padding: 20px;
             border-bottom: 1px solid rgba(255, 255, 255, 0.1);
@@ -246,11 +247,11 @@ CONTROL_PANEL_HTML = """
             justify-content: space-between;
             align-items: center;
         }
-        
+
         .data-panel-header h3 {
             color: #fb7299;
         }
-        
+
         .close-btn {
             background: none;
             border: none;
@@ -258,17 +259,17 @@ CONTROL_PANEL_HTML = """
             font-size: 1.5rem;
             cursor: pointer;
         }
-        
+
         .close-btn:hover {
             color: #fb7299;
         }
-        
+
         .data-panel-content {
             flex: 1;
             overflow: auto;
             padding: 20px;
         }
-        
+
         .data-panel-content pre {
             font-family: 'Consolas', 'Monaco', monospace;
             font-size: 0.8rem;
@@ -277,7 +278,7 @@ CONTROL_PANEL_HTML = """
             white-space: pre-wrap;
             word-break: break-all;
         }
-        
+
         /* 快捷键提示 */
         .shortcuts {
             padding: 15px;
@@ -286,7 +287,7 @@ CONTROL_PANEL_HTML = """
             font-size: 0.75rem;
             color: #666;
         }
-        
+
         .shortcuts kbd {
             background: rgba(255, 255, 255, 0.1);
             padding: 2px 6px;
@@ -302,20 +303,20 @@ CONTROL_PANEL_HTML = """
                 <h1>🎬 Bilibili Plugin</h1>
                 <p>UI Development Mode</p>
             </div>
-            
+
             <div id="scenario-list"></div>
-            
+
             <div class="shortcuts">
                 <p><kbd>R</kbd> 刷新预览 | <kbd>D</kbd> 查看数据 | <kbd>↑</kbd><kbd>↓</kbd> 切换场景</p>
             </div>
         </div>
-        
+
         <div class="preview-area">
             <div class="toolbar">
                 <button class="toolbar-btn" onclick="refreshPreview()">🔄 刷新</button>
                 <button class="toolbar-btn" onclick="toggleDataPanel()">📊 查看数据</button>
                 <button class="toolbar-btn" onclick="openInNewTab()">🔗 新标签打开</button>
-                
+
                 <select id="style-selector" class="style-selector" onchange="refreshPreview()">
                 </select>
 
@@ -323,7 +324,7 @@ CONTROL_PANEL_HTML = """
                     当前场景: <span id="current-name">-</span>
                 </div>
             </div>
-            
+
             <div class="preview-container">
                 <div class="preview-frame">
                     <iframe id="preview-iframe" width="720" height="900"></iframe>
@@ -331,7 +332,7 @@ CONTROL_PANEL_HTML = """
             </div>
         </div>
     </div>
-    
+
     <div class="data-panel" id="data-panel">
         <div class="data-panel-header">
             <h3>渲染数据</h3>
@@ -341,26 +342,26 @@ CONTROL_PANEL_HTML = """
             <pre id="data-content"></pre>
         </div>
     </div>
-    
+
     <script>
         const scenarios = SCENARIOS_DATA;
         const templateOptions = TEMPLATE_OPTIONS;
         let currentScenario = null;
         let scenarioKeys = [];
-        
+
         // 初始化样式选择器
         function initStyleSelector() {
             const selector = document.getElementById('style-selector');
-            selector.innerHTML = templateOptions.map(opt => 
+            selector.innerHTML = templateOptions.map(opt =>
                 `<option value="${opt.id}">${opt.name}</option>`
             ).join('');
         }
-        
+
         // 初始化场景列表
         function initScenarioList() {
             const container = document.getElementById('scenario-list');
             let html = '';
-            
+
             for (const [category, names] of Object.entries(scenarios)) {
                 html += `<div class="category">`;
                 html += `<div class="category-title">${category}</div>`;
@@ -370,29 +371,29 @@ CONTROL_PANEL_HTML = """
                 }
                 html += `</div>`;
             }
-            
+
             container.innerHTML = html;
         }
-        
+
         // 加载场景
         function loadScenario(name) {
             currentScenario = name;
-            
+
             // 更新按钮状态
             document.querySelectorAll('.scenario-btn').forEach(btn => {
                 btn.classList.toggle('active', btn.dataset.name === name);
             });
-            
+
             // 更新当前场景名称
             document.getElementById('current-name').textContent = name;
-            
+
             // 获取当前样式
             const style = document.getElementById('style-selector').value;
-            
+
             // 加载预览
             const iframe = document.getElementById('preview-iframe');
             iframe.src = `/render?scenario=${encodeURIComponent(name)}&style=${style}&t=${Date.now()}`;
-            
+
             // 加载数据
             fetch(`/data?scenario=${encodeURIComponent(name)}`)
                 .then(res => res.json())
@@ -400,19 +401,19 @@ CONTROL_PANEL_HTML = """
                     document.getElementById('data-content').textContent = JSON.stringify(data, null, 2);
                 });
         }
-        
+
         // 刷新预览
         function refreshPreview() {
             if (currentScenario) {
                 loadScenario(currentScenario);
             }
         }
-        
+
         // 切换数据面板
         function toggleDataPanel() {
             document.getElementById('data-panel').classList.toggle('open');
         }
-        
+
         // 新标签打开
         function openInNewTab() {
             if (currentScenario) {
@@ -420,7 +421,7 @@ CONTROL_PANEL_HTML = """
                 window.open(`/render?scenario=${encodeURIComponent(currentScenario)}&style=${style}`, '_blank');
             }
         }
-        
+
         // 键盘快捷键
         document.addEventListener('keydown', (e) => {
             if (e.key === 'r' || e.key === 'R') {
@@ -439,7 +440,7 @@ CONTROL_PANEL_HTML = """
                 loadScenario(scenarioKeys[newIndex]);
             }
         });
-        
+
         // 初始化
         initStyleSelector();
         initScenarioList();

@@ -1,18 +1,20 @@
+import asyncio
 import re
 import time
-import asyncio
 import traceback
 from collections import OrderedDict
-from typing import Dict, Any, Optional, List
+from typing import Any, Dict, List, Optional
+
 from astrbot.api import logger
-from astrbot.api.message_components import Image, Plain, Node, File
-from astrbot.api.event import MessageEventResult, MessageChain
 from astrbot.api.all import *
-from .data_manager import DataManager
+from astrbot.api.event import MessageChain, MessageEventResult
+from astrbot.api.message_components import File, Image, Node, Plain
+
 from .bili_client import BiliClient
+from .constant import BANNER_PATH, LOGO_PATH
+from .data_manager import DataManager
 from .renderer import Renderer
-from .utils import create_render_data, image_to_base64, create_qrcode, is_height_valid
-from .constant import LOGO_PATH, BANNER_PATH
+from .utils import create_qrcode, create_render_data, image_to_base64, is_height_valid
 
 
 class DynamicListener:
@@ -307,9 +309,9 @@ class DynamicListener:
         """处理转发动态的过滤与渲染数据准备。"""
         try:
             is_forward_lottery = (
-                item["orig"]["modules"]["module_dynamic"]["major"]["opus"][
-                    "summary"
-                ]["rich_text_nodes"][0].get("text")
+                item["orig"]["modules"]["module_dynamic"]["major"]["opus"]["summary"][
+                    "rich_text_nodes"
+                ][0].get("text")
                 == "互动抽奖"
             )
         except (KeyError, TypeError):
