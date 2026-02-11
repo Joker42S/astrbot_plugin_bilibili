@@ -73,15 +73,8 @@ class Main(Star):
         """启动或重启后台任务。"""
         if hasattr(self, "dynamic_listener_task") and self.dynamic_listener_task:
             self.dynamic_listener_task.cancel()
-        if hasattr(self, "refresh_task") and self.refresh_task:
-            self.refresh_task.cancel()
 
         self.dynamic_listener_task = asyncio.create_task(self.dynamic_listener.start())
-        self.refresh_task = asyncio.create_task(
-            self.bili_client.start_refresh(
-                on_refreshed=self.data_manager.set_credential
-            )
-        )
 
     @command("bili_login")
     @permission_type(PermissionType.ADMIN)
@@ -538,19 +531,3 @@ class Main(Star):
                     f"Error awaiting cancellation of dynamic_listener task: {e}"
                 )
 
-        if (
-            hasattr(self, "refresh_task")
-            and self.refresh_task
-            and not self.refresh_task.done()
-        ):
-            self.refresh_task.cancel()
-            try:
-                await self.refresh_task
-            except asyncio.CancelledError:
-                logger.info(
-                    "bilibili refresh_credential task was successfully cancelled during terminate."
-                )
-            except Exception as e:
-                logger.error(
-                    f"Error awaiting cancellation of refresh_credential task: {e}"
-                )

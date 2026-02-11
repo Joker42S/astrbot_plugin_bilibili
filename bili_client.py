@@ -1,4 +1,3 @@
-import asyncio
 from typing import Any, Awaitable, Callable, Dict, Optional, Tuple
 
 import aiohttp
@@ -52,6 +51,7 @@ class BiliClient:
     async def check_credential(self) -> bool:
         """
         检查凭据是否有效。
+        DEPRECATED: 该方法已废弃。
         """
         if not self.credential:
             return False
@@ -60,6 +60,7 @@ class BiliClient:
     async def refresh_credential(self) -> bool:
         """
         刷新凭据。
+        DEPRECATED: 该方法已废弃。
         """
         if not self.credential:
             return False
@@ -79,28 +80,13 @@ class BiliClient:
     ):
         """
         定时刷新凭据的循环。
-        :param on_refreshed: 刷新成功后的异步回调函数，接收新的凭据字典。
+        DEPRECATED: 该方法已废弃。
+        :param on_refreshed: 兼容保留。过去用于刷新成功后的异步回调。
         """
-        if (
-            not self.credential
-            or not self.credential.sessdata
-            or not self.credential.bili_jct
-        ):
-            return
-
-        while True:
-            try:
-                if self.credential:
-                    if await self.credential.check_refresh():
-                        await self.credential.refresh()
-                        logger.info("Bilibili 凭据已自动刷新。")
-                        if on_refreshed:
-                            await on_refreshed(self.get_credential_dict())
-            except Exception as e:
-                logger.error(f"自动刷新 Bilibili 凭据失败: {e}")
-
-            # 每 1 小时检查一次
-            await asyncio.sleep(3600)
+        logger.warning(
+            "start_refresh() 已废弃：为避免触发上游异常，已禁用定时刷新凭据任务。"
+        )
+        return
 
     async def get_user(self, uid: int) -> user.User:
         """
