@@ -119,9 +119,9 @@ python dev_ui.py
 
 ## 更新日志
 
-##  v1.5.2
-- 增强lottery过滤，涵盖开奖信息
-- 新增转发互动抽奖过滤，以forward_lottery标识
+## v1.5.3
+- 修复指令使用异常
+- 废弃刷新cookie的相关方法，登录状态异常时请重新登录
 
 ‼️astrbot_plugin_bilibili >= v1.4.14 需要 Astrbot >= 4.5.2；原因是使用了Astrbot >= 4.5.2推荐的函数调用写法，而Astrbot >= 4.5.3修复了webui工具显示错误，推荐升级到Astrbot >= 4.5.3
 
