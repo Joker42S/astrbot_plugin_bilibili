@@ -497,21 +497,42 @@ class Main(Star):
     async def sub_test(self, event: AstrMessageEvent, uid: str):
         """测试订阅功能。仅测试获取动态与渲染图片功能，不保存订阅信息。"""
         sub_user = event.unified_msg_origin
-        dyn = await self.bili_client.get_latest_dynamics(int(uid))
-        if dyn:
-            render_data, _ = (
-                await self.dynamic_listener._parse_and_filter_dynamics(
-                    dyn,
-                    {
-                        "uid": uid,
-                        "filter_types": [],
-                        "filter_regex": [],
-                        "last": "",
-                        "recent_ids": [],
-                    },
-                )
-            )[0]
-            await self.dynamic_listener._handle_new_dynamic(sub_user, render_data)
+        try:
+            uid_int = int(uid)
+        except (TypeError, ValueError):
+            return MessageEventResult().message("UID 必须是数字。")
+
+        dyn = await self.bili_client.get_latest_dynamics(uid_int)
+        if not dyn:
+            return MessageEventResult().message("未获取到动态数据，请稍后重试。")
+
+        result_list = await self.dynamic_listener._parse_and_filter_dynamics(
+            dyn,
+            {
+                "uid": uid,
+                "filter_types": [],
+                "filter_regex": [],
+                "last": "",
+                "recent_ids": [],
+            },
+        )
+
+        render_data = None
+        dyn_id = None
+        for maybe_render_data, maybe_dyn_id in result_list or []:
+            if maybe_render_data:
+                render_data = maybe_render_data
+                dyn_id = maybe_dyn_id
+                break
+
+        if not render_data:
+            return MessageEventResult().message(
+                "没有可用于测试推送的动态（可能没有新动态、都被过滤掉，或动态类型暂不支持）。"
+            )
+
+        await self.dynamic_listener._handle_new_dynamic(sub_user, render_data, dyn_id)
+
+        return None
 
     async def terminate(self):
         if (
@@ -530,4 +551,3 @@ class Main(Star):
                 logger.error(
                     f"Error awaiting cancellation of dynamic_listener task: {e}"
                 )
-

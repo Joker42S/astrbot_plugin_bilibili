@@ -137,9 +137,15 @@ class DynamicListener:
             self.render_cache.popitem(last=False)
 
     async def _handle_new_dynamic(
-        self, sub_user: str, render_data: Dict[str, Any], dyn_id: Optional[str] = None
+        self,
+        sub_user: str,
+        render_data: Optional[Dict[str, Any]],
+        dyn_id: Optional[str] = None,
     ):
         """处理并发送新的动态通知。"""
+        if not render_data:
+            return
+
         cached = self.render_cache.get(dyn_id) if dyn_id else None
         if cached:
             await self._send_dynamic(sub_user, cached["chain"], cached["send_node"])
