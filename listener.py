@@ -3,7 +3,7 @@ import re
 import time
 import traceback
 from collections import OrderedDict
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from astrbot.api import logger
 from astrbot.api.all import *
@@ -34,7 +34,11 @@ class DynamicListener:
         self.data_manager = data_manager
         self.bili_client = bili_client
         self.renderer = renderer
-        self.interval_mins = float(cfg.get("interval_mins", 20))
+        self.interval_mins = self._parse_float(
+            cfg.get("interval_mins"), 20, minimum=0.1
+        )
+        self.interval_secs = self.interval_mins * 60
+        self.task_gap_secs = self._parse_float(cfg.get("task_gap_secs"), 20, minimum=0)
         self.rai = cfg.get("rai", True)
         self.node = cfg.get("node", False)
         self.dynamic_limit = cfg.get("dynamic_limit", 5)
@@ -42,34 +46,151 @@ class DynamicListener:
         self.render_cache_limit = int(cfg.get("render_cache_limit", 32))
 
     async def start(self):
-        """启动后台监听循环。"""
+        """启动后台监听循环（按 UID 任务池调度）。"""
+        uid_states: Dict[int, float] = {}
+        next_dispatch_at = 0.0
+
         while True:
-            if self.bili_client.credential is None:
-                logger.warning(
-                    "Bilibili 凭据未设置，无法获取动态。请使用 /bili_login 登录或在配置中设置 sessdata。"
+            try:
+                if self.bili_client.credential is None:
+                    logger.warning(
+                        "Bilibili 凭据未设置，无法获取动态。请使用 /bili_login 登录或在配置中设置 sessdata。"
+                    )
+                    await asyncio.sleep(self.interval_secs)
+                    continue
+
+                uid_targets = self._build_uid_targets()
+                current_uids = set(uid_targets.keys())
+                now = time.monotonic()
+
+                for uid in list(uid_states):
+                    if uid not in current_uids:
+                        uid_states.pop(uid, None)
+
+                for uid in current_uids:
+                    uid_states.setdefault(uid, now)
+
+                if not current_uids:
+                    await asyncio.sleep(2)
+                    continue
+
+                due_uids = [uid for uid in current_uids if uid_states[uid] <= now]
+                if not due_uids:
+                    next_due_at = min(uid_states[uid] for uid in current_uids)
+                    wait_secs = min(max(next_due_at - now, 0.2), 2.0)
+                    await asyncio.sleep(wait_secs)
+                    continue
+
+                if now < next_dispatch_at:
+                    wait_secs = min(max(next_dispatch_at - now, 0.2), 2.0)
+                    await asyncio.sleep(wait_secs)
+                    continue
+
+                run_uid = min(due_uids, key=lambda uid: (uid_states[uid], uid))
+                await self._run_uid_task(run_uid, uid_targets.get(run_uid, []))
+
+                finished_at = time.monotonic()
+                uid_states[run_uid] = finished_at + self.interval_secs
+                next_dispatch_at = finished_at + self.task_gap_secs
+            except asyncio.CancelledError:
+                raise
+            except Exception as e:
+                logger.error(f"UID任务池调度异常: {e}\n{traceback.format_exc()}")
+                await asyncio.sleep(1)
+
+    @staticmethod
+    def _parse_float(value: Any, default: float, minimum: float = 0) -> float:
+        try:
+            parsed = float(value)
+        except (TypeError, ValueError):
+            return default
+        return max(parsed, minimum)
+
+    def _build_uid_targets(self) -> Dict[int, List[Tuple[str, Dict[str, Any]]]]:
+        """构建 UID -> 订阅目标列表 的映射，用于 UID 级去重请求。"""
+        uid_targets: Dict[int, List[Tuple[str, Dict[str, Any]]]] = {}
+        all_subs = self.data_manager.get_all_subscriptions()
+
+        for sub_user, sub_list in all_subs.items():
+            for sub_data in sub_list or []:
+                uid = sub_data.get("uid")
+                try:
+                    uid_int = int(uid)
+                except (TypeError, ValueError):
+                    continue
+
+                uid_targets.setdefault(uid_int, []).append((sub_user, sub_data))
+
+        return uid_targets
+
+    async def _run_uid_task(
+        self, uid: int, targets: List[Tuple[str, Dict[str, Any]]]
+    ) -> None:
+        """执行单个 UID 的任务：动态/直播仅请求一次，再按订阅分发。"""
+        if not targets:
+            return
+
+        try:
+            dyn = await self.bili_client.get_latest_dynamics(uid)
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            logger.error(f"拉取 UID={uid} 动态失败: {e}\n{traceback.format_exc()}")
+            dyn = None
+
+        should_check_live = any(
+            "live" not in (sub_data.get("filter_types") or [])
+            for _, sub_data in targets
+        )
+        live_room = None
+        if should_check_live:
+            try:
+                live_room = await self.bili_client.get_live_info_by_uids([uid])
+            except asyncio.CancelledError:
+                raise
+            except Exception as e:
+                logger.error(
+                    f"拉取 UID={uid} 直播状态失败: {e}\n{traceback.format_exc()}"
                 )
-                await asyncio.sleep(60 * self.interval_mins)
-                continue
+                live_room = None
 
-            all_subs = self.data_manager.get_all_subscriptions()
-            for sub_user, sub_list in all_subs.items():
-                for sub_data in sub_list:
-                    try:
-                        await self._check_single_up(sub_user, sub_data)
-                    except Exception as e:
-                        logger.error(
-                            f"处理订阅者 {sub_user} 的 UP主 {sub_data.get('uid', '未知UID')} 时发生未知错误: {e}\n{traceback.format_exc()}"
-                        )
-            await asyncio.sleep(60 * self.interval_mins)
+        for sub_user, sub_data in targets:
+            try:
+                await self._check_single_up(
+                    sub_user=sub_user,
+                    sub_data=sub_data,
+                    dyn=dyn,
+                    live_room=live_room,
+                    shared_payload=True,
+                )
+            except asyncio.CancelledError:
+                raise
+            except Exception as e:
+                logger.error(
+                    f"处理订阅者 {sub_user} 的 UP主 {sub_data.get('uid', '未知UID')} 时发生未知错误: {e}\n{traceback.format_exc()}"
+                )
 
-    async def _check_single_up(self, sub_user: str, sub_data: Dict[str, Any]):
+    async def _check_single_up(
+        self,
+        sub_user: str,
+        sub_data: Dict[str, Any],
+        dyn: Optional[Dict[str, Any]] = None,
+        live_room: Optional[Dict[str, Any]] = None,
+        shared_payload: bool = False,
+    ):
         """检查单个订阅的UP主是否有更新。"""
         uid = sub_data.get("uid")
-        if not uid:
+        if uid is None:
+            return
+
+        try:
+            uid = int(uid)
+        except (TypeError, ValueError):
             return
 
         # 检查动态更新
-        dyn = await self.bili_client.get_latest_dynamics(uid)
+        if dyn is None and not shared_payload:
+            dyn = await self.bili_client.get_latest_dynamics(uid)
         if dyn:
             result_list = await self._parse_and_filter_dynamics(dyn, sub_data)
             sent = 0
@@ -90,10 +211,12 @@ class DynamicListener:
         # 检查直播状态
         if "live" in sub_data.get("filter_types", []):
             return
-        # lives = await self.bili_client.get_live_info(uid)
-        lives = await self.bili_client.get_live_info_by_uids([uid])
-        if lives:
-            await self._handle_live_status(sub_user, sub_data, lives)
+
+        if live_room is None and not shared_payload:
+            # lives = await self.bili_client.get_live_info(uid)
+            live_room = await self.bili_client.get_live_info_by_uids([uid])
+        if live_room:
+            await self._handle_live_status(sub_user, sub_data, live_room)
 
     def _compose_plain_dynamic(
         self, render_data: Dict[str, Any], render_fail: bool = False

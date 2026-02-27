@@ -8,9 +8,15 @@
     "interval_mins": {
         "description": "interval_mins",
         "type": "int",
-        "hint": "订阅检查间隔时间，分钟数",
+        "hint": "单个UP主任务的检测周期，分钟数",
         "obvious_hint": true,
         "default": 5
+    },
+    "task_gap_secs": {
+        "description": "task_gap_secs",
+        "type": "int",
+        "hint": "相邻两个UP主任务的最小间隔，秒数",
+        "default": 20
     },
     "rai": {
         "description": "render_as_image",
