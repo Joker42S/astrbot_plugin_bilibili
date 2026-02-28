@@ -2,7 +2,7 @@ from typing import Any, Awaitable, Callable, Dict, Optional, Tuple
 
 import aiohttp
 from astrbot.api import logger
-from bilibili_api import Credential, user, video
+from bilibili_api import Credential, request_settings, user, video
 from bilibili_api.utils.network import Api
 
 
@@ -15,23 +15,48 @@ class BiliClient:
         self,
         sessdata: Optional[str] = None,
         credential_dict: Optional[Dict[str, Any]] = None,
+        proxy: Optional[str] = None,
     ) -> None:
         """
         初始化 Bilibili API 客户端。
         """
+        self.proxy = (proxy or "").strip()
+        self._apply_proxy()
         self.credential = None
         if credential_dict:
-            self.credential = Credential(**credential_dict)
+            self.credential = self._build_credential(credential_dict)
         elif sessdata:
-            self.credential = Credential(sessdata=sessdata)
+            self.credential = self._build_credential({"sessdata": sessdata})
         else:
             logger.warning("未提供 SESSDATA 或 凭据，部分需要登录的API可能无法使用。")
+
+    def _apply_proxy(self) -> None:
+        """
+        根据当前配置应用全局请求代理。
+        """
+        try:
+            request_settings.set_proxy(self.proxy)
+        except Exception as e:
+            logger.warning(f"设置 Bilibili 请求代理失败: {e}")
+
+    def _build_credential(self, credential_data: Dict[str, Any]) -> Credential:
+        """
+        构建 Credential，优先尝试携带 proxy 参数，失败时自动回退。
+        """
+        payload = dict(credential_data)
+        if self.proxy:
+            payload.setdefault("proxy", self.proxy)
+        try:
+            return Credential(**payload)
+        except TypeError:
+            payload.pop("proxy", None)
+            return Credential(**payload)
 
     def set_credential(self, credential_dict: Dict[str, Any]) -> None:
         """
         设置凭据。
         """
-        self.credential = Credential(**credential_dict)
+        self.credential = self._build_credential(credential_dict)
 
     def get_credential_dict(self) -> Optional[Dict[str, Any]]:
         """
@@ -112,6 +137,7 @@ class BiliClient:
         获取用户的最新动态。
         """
         try:
+            self._apply_proxy()
             u: user.User = await self.get_user(uid)
             return await u.get_dynamics_new()
         except Exception as e:
@@ -132,6 +158,7 @@ class BiliClient:
             return None
 
     async def get_live_info_by_uids(self, uids: list[int]) -> Optional[Dict[str, Any]]:
+        self._apply_proxy()
         API_CONFIG = {
             "url": "https://api.live.bilibili.com/room/v1/Room/get_status_info_by_uids",
             "method": "GET",

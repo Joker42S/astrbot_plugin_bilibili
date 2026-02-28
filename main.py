@@ -46,6 +46,7 @@ class Main(Star):
         self.rai = self.cfg.get("rai", True)
         self.enable_parse_miniapp = self.cfg.get("enable_parse_miniapp", True)
         self.enable_parse_BV = self.cfg.get("enable_parse_BV", True)
+        self.proxy = (self.cfg.get("proxy", "") or "").strip()
         # 读取样式配置
         self.style = self.cfg.get("renderer_template", DEFAULT_TEMPLATE)
 
@@ -55,9 +56,13 @@ class Main(Star):
         # 优先使用 DataManager 中的凭据
         saved_credential = self.data_manager.get_credential()
         if saved_credential:
-            self.bili_client = BiliClient(credential_dict=saved_credential)
+            self.bili_client = BiliClient(
+                credential_dict=saved_credential, proxy=self.proxy
+            )
         else:
-            self.bili_client = BiliClient(sessdata=self.cfg.get("sessdata"))
+            self.bili_client = BiliClient(
+                sessdata=self.cfg.get("sessdata"), proxy=self.proxy
+            )
 
         self.dynamic_listener = DynamicListener(
             context=self.context,
@@ -132,7 +137,9 @@ class Main(Star):
         """登出 Bilibili，清除凭据。"""
         self.bili_client.credential = None
         await self.data_manager.clear_credential()
-        self.bili_client = BiliClient(sessdata=self.cfg.get("sessdata"))
+        self.bili_client = BiliClient(
+            sessdata=self.cfg.get("sessdata"), proxy=self.proxy
+        )
         self.dynamic_listener.bili_client = self.bili_client
         self._start_tasks()
         return MessageEventResult().message("✅ 已登出 Bilibili，凭据已清除。")
