@@ -1,6 +1,8 @@
 ## v1.5.4
-- 新增配置项 `task_gap_secs`（默认 20 秒），用于控制相邻 UID 任务的最小执行间隔，降低请求突发风险。
+- 轮询策略优化，新增配置项 `task_gap_secs`（默认 20 秒），用于控制相邻 UID 任务的最小执行间隔，降低请求突发风险。
 - `interval_mins` 语义调整为“单个 UID 检测周期”。
+- 添加配置项用于设置代理，原因见[issue#72](https://github.com/Soulter/astrbot_plugin_bilibili/issues/72)
+- `/bili_sub_test`指令错误处理优化
 
 ## v1.5.3
 - 修复指令使用异常
